@@ -30,26 +30,38 @@ def _ck(r, what):
         raise RuntimeError(f"CUDA 오류 {r} ({what})")
 
 
+def read_meta(path):
+    """ultralytics 엔진 앞의 메타데이터(4바이트 길이 + JSON)와 나머지 직렬화 엔진 바이트."""
+    raw = open(path, "rb").read()
+    n = int.from_bytes(raw[:4], "little")
+    if 0 < n < 100000 and raw[4:5] == b"{":
+        try:
+            return json.loads(raw[4:4 + n].decode()), raw[4 + n:]
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass
+    return {}, raw
+
+
 class TRTYolo:
-    def __init__(self, path, conf=0.3, iou=0.5, use_gpu_post=True):
+    def __init__(self, path=None, conf=0.3, iou=0.5, use_gpu_post=True, share=None):
+        """share: 이미 불러온 TRTYolo. 주면 엔진(가중치)은 같이 쓰고 실행 컨텍스트·버퍼·스트림만 따로 만든다.
+        카메라 두 대(사람·헬멧)가 모델 하나를 쓸 때 가중치를 두 번 올리지 않는다. 컨텍스트는 동시에 쓰지 않는다."""
         from .gpu_post import GpuPost, blocking_sync
         blocking_sync()          # 이미 CUDA 를 쓰기 시작했으면 효과 없음 (main 에서 먼저 부른다)
         import tensorrt as trt
         self.conf, self.iou = conf, iou
-        raw = open(path, "rb").read()
-        self.meta = {}
-        n = int.from_bytes(raw[:4], "little")
-        if 0 < n < 100000 and raw[4:5] == b"{":
-            try:
-                self.meta = json.loads(raw[4:4 + n].decode())
-                raw = raw[4 + n:]
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                pass
-        names = self.meta.get("names", {})
-        self.names = {int(k): v for k, v in names.items()} if isinstance(names, dict) else dict(enumerate(names))
-        self.logger = trt.Logger(trt.Logger.WARNING)
-        self.runtime = trt.Runtime(self.logger)
-        self.engine = self.runtime.deserialize_cuda_engine(raw)
+        if share is not None:
+            self.meta, self.names = share.meta, share.names
+            self.logger, self.runtime, self.engine = share.logger, share.runtime, share.engine
+        else:
+            self.meta, raw = read_meta(path)
+            names = self.meta.get("names", {})
+            self.names = {int(k): v for k, v in names.items()} if isinstance(names, dict) else dict(enumerate(names))
+            self.logger = trt.Logger(trt.Logger.WARNING)
+            self.runtime = trt.Runtime(self.logger)
+            self.engine = self.runtime.deserialize_cuda_engine(raw)
+            if self.engine is None:
+                raise RuntimeError(f"TensorRT 엔진을 읽을 수 없음: {path}")
         self.ctx = self.engine.create_execution_context()
         cud = _cudart()
         self.stream = ctypes.c_void_p()
@@ -70,8 +82,23 @@ class TRTYolo:
         self.imgsz = self.host[self.in_name].shape[2]
         self.task = "segment" if len(self.outputs) >= 2 else "detect"
         self.infer_ms = 0.0
+        self.gpu_error = ""
         self.gpu = GpuPost.create(self) if use_gpu_post else None
-        log.info("TensorRT 추론기: %s, 앞뒤 처리 %s", path, "GPU" if self.gpu else "CPU(numpy)")
+        log.info("TensorRT 추론기: %s%s, 앞뒤 처리 %s", path or "(공유 엔진)", "" if share is None else " 추가 컨텍스트",
+                 "GPU" if self.gpu else "CPU(numpy)")
+
+    def close(self):
+        """GPU 버퍼·스트림·컨텍스트 해제 (모델 교체 시 누수 방지). 다른 스레드가 이 컨텍스트로 추론 중이면 안 된다."""
+        cud = _cudart()
+        self.gpu = None                                   # GpuPost.__del__ 이 og_destroy
+        for ptr in self.bufs.values():
+            if ptr:
+                cud.cudaFree(ptr)
+        self.bufs = {}
+        if self.stream:
+            cud.cudaStreamDestroy(self.stream)
+            self.stream = ctypes.c_void_p()
+        self.ctx = None
 
     def _letterbox(self, img):
         h, w = img.shape[:2]
@@ -96,17 +123,19 @@ class TRTYolo:
                                     D2H, self.stream), "d2h")
         _ck(cud.cudaStreamSynchronize(self.stream), "sync")
 
-    def infer(self, img, classes=None):
+    def infer(self, img, classes=None, masks=True):
+        """classes: 볼 클래스 번호 목록 (None = 전체). masks=False 면 마스크 다각형을 만들지 않는다(헬멧 판정용)."""
         t0 = time.monotonic()
         dets = None
-        if self.gpu is not None and classes is not None and len(classes) == 1:
+        if self.gpu is not None:
             try:
-                dets = self._infer_gpu(img, int(classes[0]))
+                dets = self._infer_gpu(img, self.gpu.class_mask(classes), masks)
             except Exception as e:
                 log.warning("GPU 앞뒤 처리 오류 → CPU 경로로 전환: %s", e)
                 self.gpu = None
+                self.gpu_error = str(e)
         if dets is None:
-            dets = self._infer_host(img, classes)
+            dets = self._infer_host(img, classes, masks)
         self.infer_ms = (time.monotonic() - t0) * 1000
         return dets
 
@@ -126,36 +155,37 @@ class TRTYolo:
                                sc.tolist(), self.conf, self.iou)
         return xyxy, np.array(idx, int).reshape(-1)[:20]
 
-    def _infer_gpu(self, img, cls_id):
+    def _infer_gpu(self, img, cls_mask, masks=True):
         from .detector import Detection
         h, w = img.shape[:2]
         s, px, py = self.gpu.preprocess(img)
         if not self.ctx.execute_async_v3(self.stream.value):
             raise RuntimeError("TensorRT 실행 실패")
-        cand = self.gpu.select(cls_id, self.conf)            # 여기서 GPU 완료를 기다린다(잠든 채)
+        cand = self.gpu.select(cls_mask, self.conf)          # 여기서 GPU 완료를 기다린다(잠든 채)
         if not len(cand):
             return []
         sc = cand[:, 5]
+        cl = cand[:, 6].astype(int)
         xyxy, idx = self._nms(cand[:, 1:5], sc)
         polys = [None] * len(idx)
-        if self.gpu.nm and len(idx):
+        if masks and self.gpu.nm and len(idx):
             ps = self.imgsz / self.gpu.ph
-            ms = self.gpu.masks(cand[idx, 6:], xyxy[idx] / ps)
+            ms = self.gpu.masks(cand[idx, 7:], xyxy[idx] / ps)
             polys = [self._poly(m, ps, s, px, py, w, h) for m in ms]
         dets = []
         for i, poly in zip(idx, polys):
             bx = np.clip((xyxy[i] - [px, py, px, py]) / s, 0, [w, h, w, h])
-            dets.append(Detection(cls_id, self.names.get(cls_id, str(cls_id)), float(sc[i]),
-                                  tuple(float(v) for v in bx), poly))
+            c = int(cl[i])
+            dets.append(Detection(c, self.names.get(c, str(c)), float(sc[i]), tuple(float(v) for v in bx), poly))
         return dets
 
-    def _infer_host(self, img, classes=None):
+    def _infer_host(self, img, classes=None, masks=True):
         from .detector import Detection
         x, s, px, py = self._letterbox(img)
         self._run(x)
         outs = sorted((self.host[n] for n in self.outputs), key=lambda a: a.ndim)
-        pred = outs[0][0].astype(np.float32)                   # (4+nc+nm, N)
-        nm = 32 if self.task == "segment" else 0
+        pred = outs[0][0].astype(np.float32, copy=False)       # (4+nc+nm, N)
+        nm = outs[1].shape[1] if self.task == "segment" else 0
         nc = pred.shape[0] - 4 - nm
         cls_scores = pred[4:4 + nc]
         if classes is not None:
@@ -170,13 +200,14 @@ class TRTYolo:
             sc, cl = score[keep], cls[keep]
             xyxy, idx = self._nms(pred[:4, keep].T, sc)
             h, w = img.shape[:2]
-            coef = pred[4 + nc:, keep].T if nm else None
-            proto = outs[1][0].astype(np.float32) if nm else None
+            nm_used = nm if masks else 0
+            coef = pred[4 + nc:, keep].T if nm_used else None
+            proto = outs[1][0].astype(np.float32, copy=False) if nm_used else None
             for i in idx:
                 bx = (xyxy[i] - [px, py, px, py]) / s
                 bx = np.clip(bx, 0, [w, h, w, h])
                 poly = None
-                if nm:
+                if nm_used:
                     m = 1 / (1 + np.exp(-(coef[i] @ proto.reshape(nm, -1)))).reshape(proto.shape[1:])
                     ps = self.imgsz / proto.shape[1]
                     x1, y1, x2, y2 = xyxy[i] / ps

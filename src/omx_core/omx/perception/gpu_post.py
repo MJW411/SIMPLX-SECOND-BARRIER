@@ -26,7 +26,7 @@ def lib():
         L.og_preprocess.restype = i
         L.og_preprocess.argtypes = [vp, vp, i, i, vp, vp, ctypes.POINTER(f), ctypes.POINTER(i), ctypes.POINTER(i)]
         L.og_select.restype = i
-        L.og_select.argtypes = [vp, vp, i, f, vp, ctypes.POINTER(ctypes.POINTER(f))]
+        L.og_select.argtypes = [vp, vp, ctypes.c_uint, f, vp, ctypes.POINTER(ctypes.POINTER(f))]
         L.og_masks.restype = i
         L.og_masks.argtypes = [vp, vp, vp, vp, i, vp, ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8))]
         _lib = L
@@ -85,15 +85,29 @@ class GpuPost:
             raise RuntimeError(f"GPU 전처리 오류 {r}")
         return s.value, px.value, py.value
 
-    def select(self, cls_id, conf):
-        """점수 > conf 인 후보: (n, 6+nm) [anchor, cx, cy, w, h, score, coef...] — 앵커 순서로 정렬."""
+    def class_mask(self, classes):
+        """클래스 번호 목록 → 비트마스크 (None = 전체). 32개 넘는 클래스는 GPU 경로를 쓸 수 없다."""
+        if classes is None:
+            classes = range(self.nc)
+        m = 0
+        for c in classes:
+            c = int(c)
+            if not 0 <= c < 32:
+                raise ValueError(f"GPU 경로는 클래스 0~31만 지원: {c}")
+            if c < self.nc:
+                m |= 1 << c
+        return m
+
+    def select(self, cls_mask, conf):
+        """점수 > conf 인 후보: (n, 7+nm) [anchor, cx, cy, w, h, score, cls, coef...] — 앵커 순서로 정렬.
+        cls_mask 의 클래스들 중 최고 점수 클래스를 고른다 (numpy 경로와 같은 규칙)."""
         out = ctypes.POINTER(ctypes.c_float)()
-        n = lib().og_select(self.ctx, self.y.bufs[self.pred_name], int(cls_id), float(conf), self.y.stream, ctypes.byref(out))
+        n = lib().og_select(self.ctx, self.y.bufs[self.pred_name], int(cls_mask), float(conf), self.y.stream, ctypes.byref(out))
         if n < 0:
             raise RuntimeError(f"GPU 후보 선택 오류 {-n}")
         if n == 0:
-            return np.empty((0, 6 + self.nm), np.float32)
-        a = np.ctypeslib.as_array(out, shape=(n, 6 + self.nm)).copy()
+            return np.empty((0, 7 + self.nm), np.float32)
+        a = np.ctypeslib.as_array(out, shape=(n, 7 + self.nm)).copy()
         return a[np.argsort(a[:, 0], kind="stable")]
 
     def masks(self, coef, box_proto):

@@ -13,6 +13,8 @@ log = logging.getLogger("events")
 STORED = {
     # 안전 경보 (사고 영상이 붙는 것 포함)
     "human_stop", "vanish", "conveyor_jam", "fire", "fire_end", "fault", "estop",
+    # 낙상 (알림·녹화만 — 정지 이유가 아님)
+    "person_fall",
     # 로봇 이상: 모터 고장·과열, 관절 각도 이상, 집기 실패
     "robot_fault", "robot_temp", "robot_angle", "pick_fail",
     # 사용자 판단: 재가동, 작업 시작·정지, 시스템 시작·종료, 영상 저장, 사라짐 확인, 설정·정비·보정 삭제, 출입문 수동 열기, 티칭 모드

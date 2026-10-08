@@ -25,13 +25,16 @@ camera:
   fps: 30                  # 2026-09-27: 15 → 30 (최적화로 여유 생김 — 화면 매끄럽고 판단 주기 67 → 33 ms)
 
 perception:
-  model: yolo11n-seg.engine   # ~/models 또는 data/models 안의 파일 이름
+  model: v2_best.engine       # ~/models 또는 data/models 안의 파일 이름. v2 통합 모델: 0=fall-down 1=helmet 2=human
   # direct: .engine 을 torch·ultralytics 없이 TensorRT 로 직접 실행 (실측 프로세스 1416 → 461 MB, 같은 검출 결과)
   # ultralytics: 기존 방식 (.pt/.onnx 는 항상 이쪽)
   backend: direct
   conf: 0.60               # 사람 인식 최소 확신도. 로봇이 person 0.60~0.63으로 잡혀 사용자 요청으로 0.30→0.60 (손 검출이 줄 수 있음)
   imgsz: 640
-  person_class: 0
+  # 사람으로 볼 클래스 '이름' (번호는 모델마다 다름). 넘어진 사람(fall-down)도 사람 — 거리·사라짐·재가동 검사에 모두 들어감.
+  # COCO 모델이면 person 이 쓰인다. 이 중 하나도 없는 모델은 '인식 모델 없음'으로 고장 정지.
+  person_classes: [human, fall-down, person]
+  fallen_classes: [fall-down]   # 넘어진 사람 (낙상 알림·녹화용. 정지 판단에는 쓰지 않음)
   min_depth_pixels: 30
   depth_range: [0.12, 4.0]
   max_points: 400          # 사람 한 명당 거리 계산에 쓰는 3D 점 수 (다운샘플)
@@ -54,6 +57,9 @@ safety:
   vanish_grace: 1.0        # 이 시간 안에 같은 위치에서 다시 보이면 사라짐 아님 (s)
   vanish_min_frames: 6     # 연속 N 프레임 이상 보인 사람만 사라짐 대상 (깜박이는 오검출 제외, 30fps 에서 0.2초)
   vanish_match_radius: 0.15  # 직전-현재 검출 1:1 매칭 반경 (m)
+  vanish_match_iou: 0.3      # 또는 박스가 이만큼 겹치면 같은 사람 (넘어질 때 몸 중심이 크게 움직여도)
+  fall_confirm_frames: 10    # 넘어진 사람이 연속 N 프레임 보이면 낙상 알림·녹화 (30fps 에서 0.33초). 정지는 하지 않음
+  fall_clear_frames: 30      # 넘어진 사람이 N 프레임 안 보이면 낙상 상태 해제
   exit_border_px: 40       # 화면 가장자리 이 폭 안에서 사라지면 출구로 본다
   door_roi_px: null        # [x1,y1,x2,y2] 출입문 영역 (이미지 좌표)
 
@@ -87,9 +93,12 @@ helmet:
   enabled: true
   camera: auto             # auto: /dev/v4l/by-id 에서 RealSense 가 아닌 첫 카메라
   fps: 5                   # 추론 프레임 (카메라는 30fps 로 받고 이만큼만 압축을 푼다)
-  model: helmet_best_fixed.engine   # 0=helmet 1=head. helmet_best.* 는 이름이 뒤바뀐 원본이라 쓰지 않음
+  # 모델: 사람 인식과 같은 통합 모델을 다른 실행 통로로 같이 쓴다 (perception.model)
+  match: head              # head: 사람 머리 영역에 헬멧이 겹쳐야 착용 | presence: 사람과 헬멧이 함께 보이면 착용
+  head_frac: 0.35          # head 방식: 사람 박스 위쪽 이 비율을 머리 영역으로 본다
+  person_conf: 0.50        # 사람 검출 최소 확신도
   conf: 0.50
-  confirm_frames: 3        # 연속 N 프레임 헬멧(머리 미착용 없음)이어야 문 열림 (5fps 에서 0.6초)
+  confirm_frames: 3        # 연속 N 프레임 착용이어야 문 열림 (5fps 에서 0.6초)
 
 web:
   host: 0.0.0.0

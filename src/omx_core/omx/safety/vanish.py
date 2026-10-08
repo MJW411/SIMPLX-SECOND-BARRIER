@@ -14,6 +14,14 @@ import time
 import numpy as np
 
 
+def box_iou(a, b):
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
 class VanishTracker:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -21,9 +29,14 @@ class VanishTracker:
         self._prev_hits = []      # 직전 검출별 연속 관측 프레임 수
         self.pending = []         # [{pos, px, dist, t}]
         self.unresolved = []      # [{pos, px, t, dist}]
+        self._prev_zone = []
+        self._prev_box = []
 
-    def _near(self, a_pos, a_px, b_pos, b_px):
+    def _near(self, a_pos, a_px, b_pos, b_px, a_box=None, b_box=None):
         s = self.cfg["safety"]
+        # 박스가 많이 겹치면 같은 사람 (실제 사람이 넘어질 때 몸 중심이 매칭 반경보다 크게 움직여도 놓치지 않게)
+        if a_box is not None and b_box is not None and box_iou(a_box, b_box) >= s.get("vanish_match_iou", 0.3):
+            return True
         if a_pos is not None and b_pos is not None:
             return float(np.linalg.norm(a_pos - b_pos)) < s["vanish_match_radius"]
         return float(np.hypot(a_px[0] - b_px[0], a_px[1] - b_px[1])) < 60
@@ -46,8 +59,9 @@ class VanishTracker:
         # 직전 ↔ 현재 1:1 탐욕 매칭 (가까운 쌍부터)
         pairs = []
         for i, (ppos, ppx, _) in enumerate(self.prev):
+            pbox = self._prev_box[i] if i < len(self._prev_box) else None
             for j, c in enumerate(cur):
-                if self._near(ppos, ppx, c[0], c[1]):
+                if self._near(ppos, ppx, c[0], c[1], pbox, c[4]):
                     d = (np.linalg.norm(ppos - c[0]) if ppos is not None and c[0] is not None
                          else np.hypot(ppx[0] - c[1][0], ppx[1] - c[1][1]) / 1000)
                     pairs.append((d, i, j))
@@ -68,13 +82,13 @@ class VanishTracker:
             box = self._prev_box[i] if i < len(self._prev_box) else None
             if self._is_exit(ppx, in_zone, percept.shape) or self._box_at_edge(box, percept.shape):
                 continue
-            self.pending.append({"pos": ppos, "px": ppx, "dist": pdist, "t": now})
+            self.pending.append({"pos": ppos, "px": ppx, "dist": pdist, "t": now, "box": box})
         # 매칭 안 된 현재 검출 → 대기 중인 위치에서 다시 나타났나?
         for j, c in enumerate(cur):
             if j in used_c:
                 continue
             for k, pd in enumerate(self.pending):
-                if self._near(pd["pos"], pd["px"], c[0], c[1]):
+                if self._near(pd["pos"], pd["px"], c[0], c[1], pd.get("box"), c[4]):
                     self.pending.pop(k)
                     break
         # 유예시간 초과 → 미해결 사라짐
@@ -110,6 +124,3 @@ class VanishTracker:
         self.unresolved.clear()
         self.pending.clear()
         return n
-
-    _prev_zone = []
-    _prev_box = []
