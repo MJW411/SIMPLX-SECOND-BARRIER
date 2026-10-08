@@ -125,6 +125,48 @@ sm._fire_retry_t -= 3
 sm._fire_home()
 check(len(calls) == 2, "취소되면 2초 뒤 다시 보냄")
 
+print("[사라짐: 화면 밖으로 나감 / 들려 나감 / 진짜 사라짐]")
+from omx.safety.vanish import VanishTracker  # noqa: E402
+
+
+def P(box):
+    x1, y1, x2, y2 = box
+    return SimpleNamespace(pos=None, px=((x1 + x2) / 2, (y1 + y2) / 2), dist=0.5, in_zone=True, box=box)
+
+
+def run_frames(vt, frames, t0=0.0, dt=0.1):
+    new = []
+    for k, persons in enumerate(frames):
+        new += vt.update(SimpleNamespace(persons=persons, shape=(480, 640)), t0 + k * dt)
+    return new
+
+
+grace = C["safety"]["vanish_grace"]
+tail = [[]] * int(grace / 0.1 + 5)                 # 유예시간이 지나도록 빈 화면
+# 1) 손이 위에서 들어왔다가 위로 나감 (마지막 박스가 위 가장자리에 닿음, 중심은 가장자리에서 멂)
+vt = VanishTracker(C)
+hand = [[P((300, 0, 360, 200))]] * 10
+new = run_frames(vt, hand + tail)
+check(not new and not vt.unresolved, "위 가장자리로 나간 손 → 사라짐 아님")
+# 2) 피규어(F)를 손(H)이 집어 위로 나감: F 가 화면 가운데서 끊기고, 겹친 H 가 이어서 위로 나감
+vt = VanishTracker(C)
+F = (300, 250, 330, 330)
+seq = [[P(F)]] * 8                                  # 피규어 확립
+seq += [[P(F), P((290, 120, 350, 300))]] * 8        # 손이 내려와 피규어를 덮음
+seq += [[P((290, 100, 350, 280))], [P((292, 60, 352, 240))], [P((294, 20, 354, 200))], [P((296, 0, 356, 170))]] + [[P((296, 0, 356, 150))]] * 6   # 피규어 끊김, 손이 위로
+seq += tail
+new = run_frames(vt, seq)
+check(not new and not vt.unresolved, f"손이 피규어를 들고 나감 → 사라짐 아님 (미해결 {len(vt.unresolved)})")
+# 3) 피규어가 가운데서 그냥 사라짐 (겹친 검출 없음)
+vt = VanishTracker(C)
+new = run_frames(vt, [[P(F)]] * 8 + tail)
+check(len(new) == 1 and len(vt.unresolved) == 1, "가운데서 그냥 사라짐 → 사라짐 (가려짐 의심)")
+# 4) 손이 덮었지만 손은 화면 안에 남음 → 사라짐 유지
+vt = VanishTracker(C)
+seq = [[P(F)]] * 8 + [[P(F), P((290, 120, 350, 300))]] * 8 + [[P((290, 120, 350, 300))]] * int(grace / 0.1 + 5)
+new = run_frames(vt, seq)
+check(len(vt.unresolved) == 1, "손이 덮고 화면 안에 남음 → 사라짐 유지")
+
 # ------------------------------------------------------------------ 실행기
 print("[그리퍼 목표 유지]")
 bus = SimBus()

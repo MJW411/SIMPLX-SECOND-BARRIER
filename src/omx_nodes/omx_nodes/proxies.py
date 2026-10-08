@@ -314,10 +314,15 @@ class SafetyProxy:
 
 
 class RunnerProxy:
-    """출입문 불빛·컨베이어가 보는 runner.running (로봇 노드의 작업 순서 실행 여부)."""
+    """출입문 불빛·컨베이어가 보는 runner.running / done, 그리고 작업 정지 명령 (로봇 노드의 작업 순서)."""
 
-    def __init__(self, robot_sub):
+    def __init__(self, robot_sub, rpc=None):
         self.sub = robot_sub
+        self.rpc = rpc
+
+    def stop(self, why="정지 명령"):
+        if self.rpc is not None:
+            self.rpc.send("runner_stop", why=why)
 
     @property
     def running(self):
