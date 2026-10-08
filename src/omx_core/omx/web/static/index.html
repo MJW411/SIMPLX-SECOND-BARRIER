@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e16">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<title>OMX 세컨드 배리어</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<!-- icon sprite -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-overview" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></symbol>
+    <symbol id="i-robot" viewBox="0 0 24 24"><path d="M5 21h14"/><path d="M8 21v-4l3-3"/><circle cx="11" cy="14" r="1.6"/><path d="M11 12.5 14 7"/><circle cx="14.5" cy="6" r="1.6"/><path d="M16 6h3l1 2"/></symbol>
+    <symbol id="i-teach" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="m9 6 3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></symbol>
+    <symbol id="i-program" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></symbol>
+    <symbol id="i-io" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="3"/><circle cx="8" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/></symbol>
+    <symbol id="i-events" viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.4 7.4a8 8 0 1 0 11.2 0"/></symbol>
+  </defs>
+</svg>
+
+<!-- Login -->
+<div id="login" class="login hidden">
+  <form id="loginForm" class="login-card">
+    <div class="brand big"><img src="/static/icon.svg" alt=""><div><b>OMX 세컨드 배리어</b><span>로봇 안전 관제</span></div></div>
+    <label class="field"><span>아이디</span><input id="lu" autocomplete="username" value="admin"></label>
+    <label class="field"><span>비밀번호</span><input id="lp" type="password" autocomplete="current-password"></label>
+    <button class="btn primary wide" type="submit">로그인</button>
+    <p id="loginErr" class="err"></p>
+  </form>
+</div>
+
+<div id="app" class="app hidden">
+  <nav class="sidebar">
+    <div class="brand"><img src="/static/icon.svg" alt=""><div><b>OMX</b><span>세컨드 배리어</span></div></div>
+    <a data-page="overview" class="active"><svg><use href="#i-overview"/></svg><span>모니터링</span></a>
+    <a data-page="robot"><svg><use href="#i-robot"/></svg><span>로봇</span></a>
+    <a data-page="teach"><svg><use href="#i-teach"/></svg><span>티칭</span></a>
+    <a data-page="program"><svg><use href="#i-program"/></svg><span>작업</span></a>
+    <a data-page="io"><svg><use href="#i-io"/></svg><span>입출력</span></a>
+    <a data-page="events"><svg><use href="#i-events"/></svg><span>이벤트</span><em id="unacked" class="count hidden"></em></a>
+    <a data-page="videos"><svg><use href="#i-video"/></svg><span>영상</span><em id="vidUnacked" class="count hidden"></em></a>
+    <a data-page="settings"><svg><use href="#i-settings"/></svg><span>설정</span></a>
+    <div class="side-foot"><span id="connDot" class="dot"></span><span id="connTxt">연결 중…</span></div>
+  </nav>
+
+  <header class="topbar">
+    <div id="stateBadge" class="state">—</div>
+    <div class="top-info">
+      <div class="top-line"><b id="minDist">—</b><span id="profileTxt" class="muted small"></span></div>
+      <div id="reasons" class="muted small ellipsis"></div>
+    </div>
+    <button id="topRestart" class="btn ok top-restart hidden"><svg><use href="#i-play"/></svg>재가동</button>
+    <button id="estop" class="estop" title="비상정지"><span>비상<br>정지</span></button>
+  </header>
+
+  <main class="content">
+    <!-- ============ Overview ============ -->
+    <section class="page" id="page-overview">
+      <div class="grid-2">
+        <div class="stack">
+          <div class="card pad0"><div class="cam-slot" data-cam="overview"></div></div>
+          <div class="kpis" id="kpis"></div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-h"><h3>안전</h3><span id="calBadge" class="tag"></span></div>
+            <div id="calWarn" class="latch hidden">보정이 없어 <b>카메라까지 거리</b>로 판단하고 있습니다. 로봇 옆의 사람을 제대로 판단하려면 <b>설정 → 보정 → 자동 보정 시작</b>을 하세요.</div>
+            <div id="latchBox" class="latch hidden"></div>
+            <div class="btn-row">
+              <button class="btn ok big" id="btnRestart"><svg><use href="#i-play"/></svg>재가동</button>
+            </div>
+            <div class="btn-row">
+              <button class="btn toggle" id="btnMaint">정비 모드</button>
+              <button class="btn toggle" data-teachmode>티칭 모드</button>
+              <button class="btn danger hidden" id="btnFireEnd">화재 상황 종료</button>
+            </div>
+            <dl class="kv" id="safetyKv"></dl>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>로봇</h3><span id="robotTag" class="tag"></span></div>
+            <dl class="kv" id="robotKv"></dl>
+            <div class="btn-row">
+              <button class="btn" id="ovTorque"><svg><use href="#i-power"/></svg>토크 켜기</button>
+              <button class="btn" id="ovHome"><svg><use href="#i-home"/></svg>홈으로</button>
+              <button class="btn" id="ovStop"><svg><use href="#i-stop"/></svg>동작 정지</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Robot ============ -->
+    <section class="page hidden" id="page-robot">
+      <div class="grid-2">
+        <div class="stack">
+          <div class="card">
+            <div class="card-h"><h3>전원</h3><span id="torqueTag" class="tag"></span></div>
+            <div class="btn-row">
+              <button class="btn ok" id="btnTorqueOn"><svg><use href="#i-power"/></svg>토크 켜기</button>
+              <button class="btn" id="btnPark">접고 토크 끄기</button>
+              <button class="btn ghost" id="btnTorqueOff">토크 끄기</button>
+            </div>
+            <p class="hint">"접고 토크 끄기"는 팔을 접힌 휴식 자세로 옮긴 뒤 토크를 끄고, 팔이 처지지 않는지 확인합니다.</p>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>동작</h3></div>
+            <div class="btn-row">
+              <button class="btn" id="btnHome"><svg><use href="#i-home"/></svg>홈으로</button>
+              <button class="btn" id="btnStop"><svg><use href="#i-stop"/></svg>동작 정지</button>
+              <button class="btn" id="btnReset">고장·비상정지 해제</button>
+            </div>
+            <label class="slider">속도 <input type="range" id="speed" min="1" max="20" step="1"><b id="speedTxt"></b><span class="muted small">최대 <span id="speedCap"></span></span></label>
+            <dl class="kv" id="motionKv"></dl>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>관절</h3><span class="muted small">엔코더 실측값 · 위치는 FK로 계산</span></div>
+          <div id="jointList" class="joints"></div>
+          <div class="tcp" id="tcpBig"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Teach ============ -->
+    <section class="page hidden" id="page-teach">
+      <div class="grid-2">
+        <div class="stack">
+          <div class="card pad0"><div class="cam-slot" data-cam="teach"></div></div>
+          <div class="card teachmode-card">
+            <div class="card-h"><h3>티칭 모드</h3><span id="teachModeTag" class="tag"></span></div>
+            <p class="hint">켜면 로봇 옆에 사람이 있어도 감속·정지·사라짐 정지를 하지 않습니다. 사람·사라짐 때문에 걸린 정지도 풀립니다.
+              작업(프로그램) 실행은 막히고, 화재·비상정지·로봇 고장은 그대로 동작합니다. 티칭이 끝나면 꼭 끄세요.</p>
+            <div class="btn-row"><button class="btn toggle" data-teachmode>티칭 모드 켜기</button></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>자세</h3><span class="muted small" id="homeTxt"></span></div>
+            <div class="inline-form">
+              <input id="poseName" placeholder="자세 이름 (예: pick_above)">
+              <button class="btn primary" id="btnSavePose">현재 자세 저장</button>
+            </div>
+            <p class="hint">픽앤플레이스 템플릿에 쓰는 이름: <code>home</code> <code>pick_above</code> <code>pick</code> <code>place_above</code> <code>place</code></p>
+            <div id="poseList" class="list"></div>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-h"><h3>조그</h3>
+              <div class="seg" id="jogMode"><button data-m="joint" class="active">관절</button><button data-m="cart">좌표</button></div>
+              <label class="switch"><input type="checkbox" id="kbJog"><span></span>키보드</label></div>
+            <div id="jogJoint" class="jj">
+              <div class="jj-row" data-j="0"><span class="jn">J1 베이스<small>좌우 회전</small></span><button data-jj="0,-1"><kbd>A</kbd>−</button><div class="jbar"><i></i><b></b></div><button data-jj="0,1"><kbd>Q</kbd>+</button></div>
+              <div class="jj-row" data-j="1"><span class="jn">J2 어깨<small>앞뒤로 숙이기</small></span><button data-jj="1,-1"><kbd>S</kbd>−</button><div class="jbar"><i></i><b></b></div><button data-jj="1,1"><kbd>W</kbd>+</button></div>
+              <div class="jj-row" data-j="2"><span class="jn">J3 팔꿈치<small>굽히기·펴기</small></span><button data-jj="2,-1"><kbd>D</kbd>−</button><div class="jbar"><i></i><b></b></div><button data-jj="2,1"><kbd>E</kbd>+</button></div>
+              <div class="jj-row" data-j="3"><span class="jn">J4 손목<small>위아래 꺾기</small></span><button data-jj="3,-1"><kbd>F</kbd>−</button><div class="jbar"><i></i><b></b></div><button data-jj="3,1"><kbd>R</kbd>+</button></div>
+              <div class="jj-row" data-j="4"><span class="jn">J5 손목 회전<small>그리퍼 돌리기</small></span><button data-jj="4,-1"><kbd>G</kbd>−</button><div class="jbar"><i></i><b></b></div><button data-jj="4,1"><kbd>T</kbd>+</button></div>
+              <div class="jj-row grip" data-j="5"><span class="jn">그리퍼<small>닫기 · 열기</small></span><button data-jj="5,-1"><kbd>C</kbd>닫기</button><div class="jbar"><i></i><b></b></div><button data-jj="5,1"><kbd>O</kbd>열기</button></div>
+            </div>
+            <div id="jogCart" class="jog hidden">
+              <div class="jog-group"><span>X</span><button data-jog="0,1">앞</button><button data-jog="0,-1">뒤</button></div>
+              <div class="jog-group"><span>Y</span><button data-jog="1,1">왼쪽</button><button data-jog="1,-1">오른쪽</button></div>
+              <div class="jog-group"><span>Z</span><button data-jog="2,1">위</button><button data-jog="2,-1">아래</button></div>
+              <div class="jog-group"><span>기울기</span><button data-jog="3,1">숙이기</button><button data-jog="3,-1">들기</button></div>
+            </div>
+            <label class="slider">조그 속도 <input type="range" id="jogSpeed" min="1" max="20" step="1"><b id="jogSpeedTxt"></b></label>
+            <p class="hint" id="jogHint">누르고 있는 동안만 움직입니다. 막대 = 관절 가동 범위 안의 현재 위치(각도). 키보드: 관절마다 위 키 +, 아래 키 −.</p>
+            <div class="tcp" id="tcpTeach"></div>
+            <div class="err small" id="jogBlocked"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>그리퍼</h3><span class="muted small" id="gripNow"></span></div>
+            <p class="err small hidden" id="gripWarn"></p>
+            <h4 class="sub">가동 범위 <span class="muted small" id="gripRangeNow"></span></h4>
+            <div class="form-grid">
+              <label class="field"><span>닫힘 끝 (0%, rad)</span><input type="number" id="gripCloseIn" step="0.01" min="0" max="1.05"></label>
+              <label class="field"><span>열림 끝 (100%, rad)</span><input type="number" id="gripOpenIn" step="0.01" min="0" max="1.05"></label>
+            </div>
+            <div class="btn-row">
+              <button class="btn" id="btnGripCloseSet">지금 위치를 닫힘 끝으로</button>
+              <button class="btn" id="btnGripOpenSet">지금 위치를 열림 끝으로</button>
+              <button class="btn ghost" id="btnGripRangeSave">입력값 저장</button>
+            </div>
+            <p class="hint">위 관절 조그의 그리퍼 <kbd>C</kbd> 닫기 / <kbd>O</kbd> 열기로 원하는 끝까지 움직인 뒤 "지금 위치를 …"을 누르거나, 값을 넣고 "입력값 저장"을 누르세요.
+              열기·닫기·열림 %는 이 범위 안에서 움직입니다. 그리퍼가 움직일 수 있는 한계는 0~1.05 rad입니다.</p>
+            <h4 class="sub">시험</h4>
+            <div class="btn-row">
+              <button class="btn" id="btnGripOpen">열기</button>
+              <button class="btn" id="btnGripClose">닫기</button>
+            </div>
+            <label class="slider">열림 정도 <input type="range" id="gripPct" min="0" max="100" step="5"><b id="gripPctTxt"></b></label>
+            <label class="slider">힘 <input type="range" id="gripForce" min="5" max="100" step="5"><b id="gripForceTxt"></b></label>
+            <p class="hint">열림 정도를 옮기면 바로 움직입니다. 힘 = 물체를 조이는 세기(모터 전류 한도). 열기·닫기 버튼은 아래 "기본 힘"을 씁니다.</p>
+            <h4 class="sub">저장한 그리퍼 동작</h4>
+            <div id="gripList" class="list"></div>
+            <div class="inline-form">
+              <input id="gripName" placeholder="동작 이름 (예: 작은 부품 집기)">
+              <button class="btn primary" id="btnGripSave">지금 위치·힘으로 저장</button>
+            </div>
+            <p class="hint">저장한 동작은 작업의 <b>그리퍼 (저장 동작·열림 %)</b> 단계에서 고를 수 있습니다. 자세 이동·홈 이동은 팔만 움직이고 그리퍼는 그대로입니다.</p>
+            <details class="more" id="gripRef"><summary>기본 힘 (열기·닫기 단계에서 힘을 따로 정하지 않았을 때)</summary>
+              <label class="slider">기본 힘 <input type="range" id="gripDefForce" min="5" max="100" step="5"><b id="gripDefForceTxt"></b></label>
+            </details>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>도구</h3></div>
+            <div class="btn-row">
+              <button class="btn" id="btnAlignDown">Z축 수직 정렬</button>
+              <button class="btn" id="btnAlignHoriz">수평 정렬</button>
+              <button class="btn toggle" id="btnFreedrive">직접 교시 (프리드라이브)</button>
+            </div>
+            <p class="hint">직접 교시를 켜면 팔 관절의 힘이 빠져 손으로 옮길 수 있습니다. 그리퍼는 계속 잡고 있습니다. 켜기 전에 팔을 손으로 받쳐 주세요.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Program ============ -->
+    <section class="page hidden" id="page-program">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-h"><h3>프로그램</h3><span class="tag warn hidden" id="seqDirty">저장 안 됨</span></div>
+          <ol id="seqList" class="seq prog"></ol>
+          <div class="inline-form">
+            <select id="stepType">
+              <option value="move">관절 이동 (MoveJ)</option><option value="linear">직선 이동 (MoveL)</option>
+              <option value="home">홈 이동</option>
+              <option value="grip_open">그리퍼 열기</option><option value="grip_close">그리퍼 닫기</option>
+              <option value="grip">그리퍼 (저장 동작·열림 %)</option>
+              <option value="pause">시간 대기</option><option value="wait_sensor2">센서 대기 (D12)</option>
+              <option value="conveyor">컨베이어</option>
+            </select>
+            <button class="btn" id="btnAddStep">+ 추가</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn ghost" data-quick="grip_open">+ 그리퍼 열기</button>
+            <button class="btn ghost" data-quick="grip_close">+ 그리퍼 닫기</button>
+            <button class="btn ghost" data-quick="wait_sensor2">+ 센서 대기 (D12)</button>
+          </div>
+          <p class="hint">새 단계는 선택한 단계 바로 다음에 들어갑니다. 단계를 누르면 오른쪽에서 편집합니다.</p>
+          <div class="btn-row">
+            <button class="btn primary" id="btnSeqSave">저장</button>
+            <button class="btn" id="btnSeqTemplate">픽앤플레이스 템플릿</button>
+            <button class="btn ghost" id="btnSeqClear">비우기</button>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-h"><h3 id="edTitle">단계 편집</h3>
+              <div class="btn-row tight">
+                <button class="btn ghost" id="btnStepUp" title="위로">↑</button>
+                <button class="btn ghost" id="btnStepDown" title="아래로">↓</button>
+                <button class="btn ghost" id="btnStepDup">복제</button>
+                <button class="btn ghost" id="btnStepDel">삭제</button>
+              </div>
+            </div>
+            <div id="stepEditor" class="step-editor"></div>
+            <div class="btn-row">
+              <button class="btn" id="btnStepRun"><svg><use href="#i-play"/></svg>이 단계만 실행</button>
+              <button class="btn" id="btnRunFrom"><svg><use href="#i-play"/></svg>이 단계부터 1회</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>실행</h3><span id="cycleTag" class="tag"></span></div>
+            <div class="btn-row">
+              <button class="btn ok big" id="btnCycleStart"><svg><use href="#i-play"/></svg>반복 시작</button>
+              <button class="btn big" id="btnCycleOnce"><svg><use href="#i-play"/></svg>1회 실행</button>
+              <button class="btn big" id="btnCycleStop"><svg><use href="#i-stop"/></svg>정지</button>
+            </div>
+            <label class="switch"><input type="checkbox" id="gripCheck"><span></span>집기 실패 감지</label>
+            <dl class="kv" id="cycleKv"></dl>
+            <p class="hint">실행 버튼은 저장 안 된 변경이 있으면 먼저 저장합니다. 한 번 실행은 몇 분으로 제한됩니다(safety_limits.yaml).</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ I/O ============ -->
+    <section class="page hidden" id="page-io">
+      <div class="grid-2">
+        <div class="stack">
+          <div class="card">
+            <div class="card-h"><h3>장치</h3><span id="devTag" class="tag"></span></div>
+            <div class="tiles">
+              <button class="tile" data-dev="sensor2"><span>도착 센서 (D12)</span><b>—</b></button>
+              <button class="tile fire" data-dev="fire"><span>화재</span><b>—</b></button>
+              <button class="tile" data-dev="door"><span>출입문</span><b>—</b></button>
+              <button class="tile" data-dev="conveyor"><span>컨베이어</span><b>—</b></button>
+              <div class="tile lamp" id="lampTile"><span>상태 불빛</span><b>—</b></div>
+            </div>
+            <p class="hint" id="devHint"></p>
+            <dl class="kv" id="devKv"></dl>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>컨베이어 감시</h3></div>
+            <dl class="kv" id="convKv"></dl>
+            <div class="btn-row"><button class="btn ghost" id="btnConvClear">컨베이어 이상 해제</button></div>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-h"><h3>입구 카메라 · 헬멧</h3><span id="helmetTag" class="tag"></span></div>
+            <img id="helmetImg" class="helmet-img" alt="입구 카메라">
+            <dl class="kv" id="helmetKv"></dl>
+            <p class="hint">헬멧을 쓴 사람이 0.6초 동안 연속으로 보이면 출입문이 열리고, 마지막으로 확인된 뒤 닫힘 시간이 지나면 닫힙니다. 머리(미착용)가 보이면 닫힌 채로 둡니다. 화재 중에는 계속 열려 있습니다.</p>
+            <div class="form-grid">
+              <label class="field"><span>출입문 닫힘 시간 (초)</span><input type="number" id="doorClose" min="1" max="60" step="1"></label>
+            </div>
+            <div class="btn-row">
+              <button class="btn" id="btnDoorClose">저장</button>
+              <button class="btn ghost" id="btnDoorOpen">지금 문 열기</button>
+            </div>
+          </div>
+          <div class="card pad0"><div class="cam-slot" data-cam="io"></div></div>
+          <div class="card">
+            <div class="card-h"><h3>출구 영역</h3><span class="muted small" id="roiInfo"></span></div>
+            <p class="hint">이 영역이나 화면 가장자리, 감시 구역 밖에서 사라진 사람은 "사라짐"이 아니라 "나감"으로 봅니다.</p>
+            <div class="btn-row">
+              <button class="btn" id="btnRoiSet">영상에서 지정</button>
+              <button class="btn ghost" id="btnRoiClear">지우기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Events ============ -->
+    <section class="page hidden" id="page-events">
+      <div class="card">
+        <div class="card-h">
+          <div class="seg" id="evFilter">
+            <button data-f="all" class="active">전체</button><button data-f="alarm">경보</button><button data-f="unacked">미확인</button>
+          </div>
+          <div class="btn-row tight">
+            <button class="btn ghost" id="btnNotif">알림 켜기</button>
+            <button class="btn" id="btnAckAll">모두 확인</button>
+          </div>
+        </div>
+        <div id="eventList" class="events"></div>
+      </div>
+    </section>
+
+    <!-- ============ Videos ============ -->
+    <section class="page hidden" id="page-videos">
+      <div class="card">
+        <div class="card-h wrap">
+          <div class="seg" id="vidCat">
+            <button data-c="human" class="active">사람 근접 정지<em class="n" id="vc-human"></em></button>
+            <button data-c="conveyor">물품 미도달<em class="n" id="vc-conveyor"></em></button>
+            <button data-c="fire">화재<em class="n" id="vc-fire"></em></button>
+            <button data-c="other">기타<em class="n" id="vc-other"></em></button>
+          </div>
+          <div class="btn-row tight">
+            <input type="date" id="vidDay" title="날짜로 찾기">
+            <button class="btn ghost" id="vidDayAll">모든 날짜</button>
+          </div>
+        </div>
+        <p class="hint" id="vidHint"></p>
+        <div id="vidList" class="vids"></div>
+        <div class="btn-row"><button class="btn ghost hidden" id="vidMore">이전 영상 더 보기</button></div>
+      </div>
+    </section>
+
+    <!-- ============ Settings ============ -->
+    <section class="page hidden" id="page-settings">
+      <div class="subnav" id="setNav">
+        <button data-s="safety" class="active">안전</button><button data-s="calib">보정</button>
+        <button data-s="model">인식 모델</button><button data-s="rec">녹화</button><button data-s="system">시스템</button>
+      </div>
+
+      <div class="setpane" id="set-safety">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-h"><h3>거리 기준</h3></div>
+            <div class="seg" id="profSeg"><button data-p="figure">피규어 시연</button><button data-p="human">실제 사람</button></div>
+            <p class="hint">누른 기준이 바로 적용됩니다. 아래 값은 <b>지금 적용 중인 기준</b>의 값이며, 저장하면 즉시 반영됩니다.</p>
+            <div class="thr-now" id="thrNow"></div>
+            <div class="form-grid">
+              <label class="field"><span>감속 거리 (m)</span><input type="number" id="thrSlow" step="0.01"></label>
+              <label class="field"><span>정지 거리 (m)</span><input type="number" id="thrStop" step="0.01"></label>
+              <label class="field"><span>재가동 허용 거리 (m)</span><input type="number" id="thrClear" step="0.01"></label>
+              <label class="field"><span>사라짐 유예 (초)</span><input type="number" id="vanGrace" step="0.1"></label>
+            </div>
+            <button class="btn primary" id="btnThr">기준 저장</button>
+            <p class="hint">정지 &lt; 감속 &lt; 재가동 허용 거리 순이어야 합니다. 사람이 재가동 허용 거리보다 멀어져야 재가동할 수 있습니다.
+              거리는 사람(손)에서 로봇 팔 표면까지입니다. 인식→정지에 약 0.2초가 걸리므로 정지 거리는 10 cm 이상을 권장합니다.</p>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>무인 시험 감시</h3></div>
+            <div class="form-grid">
+              <label class="field"><span>카메라에서 이 거리(m) 안에 사람이 보이면 정지 (0 = 끔)</span><input type="number" id="guardM" step="0.1" min="0" max="5"></label>
+            </div>
+            <button class="btn primary" id="btnGuard">저장</button>
+            <p class="hint">무인 시험용 추가 보호입니다. 보정 여부와 관계없이 동작합니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="setpane hidden" id="set-calib">
+        <div class="grid-2">
+          <div class="card pad0"><div class="cam-slot" data-cam="calib"></div></div>
+          <div class="card">
+            <div class="card-h"><h3>카메라-로봇 보정</h3><span id="calTag" class="tag"></span></div>
+            <p class="hint">자동 보정: 조명을 켜고 토크 켜기·재가동 후 누르면, 로봇이 8개 자세를 돌며 주황색 몸체를 기구학 모델에 맞춥니다(약 30초). 수동 보정: 서로 다른 자세 4곳 이상에서 그리퍼 끝을 클릭하거나 ArUco 4x4 마커로 점을 추가합니다.</p>
+            <div class="btn-row"><button class="btn ok wide" id="btnCalAuto">자동 보정 시작</button></div>
+            <div class="btn-row">
+              <button class="btn" id="btnCalClick">클릭으로 점 추가</button>
+              <button class="btn" id="btnCalAruco">마커로 점 추가</button>
+              <button class="btn" id="btnCalSolve">계산</button>
+              <button class="btn ghost" id="btnCalReset">수동 점 지우기</button>
+              <button class="btn ghost" id="btnCalDelete">보정 결과 삭제</button>
+            </div>
+            <dl class="kv" id="calKv"></dl>
+          </div>
+        </div>
+      </div>
+
+      <div class="setpane hidden" id="set-model">
+        <div class="card narrow">
+          <div class="card-h"><h3>인식 모델</h3></div>
+          <div class="inline-form"><select id="modelSel"></select><button class="btn primary" id="btnModel">적용</button></div>
+          <div class="inline-form"><input type="file" id="modelFile" accept=".pt,.engine,.onnx"><button class="btn" id="btnUpload">업로드</button></div>
+          <div class="form-grid">
+            <label class="field"><span>사람 인식 최소 확신도 (%)</span><input type="number" id="confPct" min="10" max="95" step="5"></label>
+          </div>
+          <button class="btn primary" id="btnConf">확신도 저장</button>
+          <p class="hint">이보다 낮은 확신도의 검출은 무시합니다. 높이면 로봇·물건을 사람으로 잘못 보는 일이 줄지만, 손처럼 일부만 보이는 사람을 놓칠 수 있습니다.</p>
+          <p class="hint">.engine 파일은 TensorRT로 바로 실행합니다. .pt를 고르면 바로 쓰기 시작하고, 뒤에서 TensorRT 엔진으로 변환한 뒤 자동으로 바꿉니다.</p>
+          <dl class="kv" id="modelKv"></dl>
+        </div>
+      </div>
+
+      <div class="setpane hidden" id="set-rec">
+        <div class="card narrow">
+          <div class="card-h"><h3>이벤트 녹화</h3></div>
+          <div class="form-grid">
+            <label class="field"><span>이벤트 전 n (초)</span><input type="number" id="recPre" min="0"></label>
+            <label class="field"><span>이벤트 후 m (초)</span><input type="number" id="recPost" min="0"></label>
+            <label class="field"><span>컨베이어 이상 후 L (초)</span><input type="number" id="recConv" min="0"></label>
+            <label class="field"><span>컨베이어 제한시간 (초)</span><input type="number" id="convTimeout" step="0.5"></label>
+          </div>
+          <button class="btn primary" id="btnRec">저장</button>
+          <dl class="kv" id="recKv"></dl>
+        </div>
+      </div>
+
+      <div class="setpane hidden" id="set-system">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-h"><h3>자원 사용</h3></div>
+            <div id="sysBars" class="bars"></div>
+            <dl class="kv" id="sysKv"></dl>
+            <div class="btn-row">
+              <button class="btn" id="btnSysRestart">프로그램 재시작</button>
+              <button class="btn danger" id="btnSysShutdown">프로그램 종료</button>
+              <button class="btn ghost" id="btnLogs">로그 보기</button>
+            </div>
+            <pre id="logBox" class="logbox hidden"></pre>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>계정</h3></div>
+            <div class="form-grid">
+              <label class="field"><span>현재 비밀번호</span><input type="password" id="pwOld" autocomplete="current-password"></label>
+              <label class="field"><span>새 비밀번호 (6자 이상)</span><input type="password" id="pwNew" autocomplete="new-password"></label>
+            </div>
+            <div class="btn-row">
+              <button class="btn primary" id="btnPw">비밀번호 변경</button>
+              <button class="btn ghost" id="btnLogout">로그아웃</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- single camera element, moved into the active page's slot -->
+  <div id="camHome" class="hidden">
+    <div class="cam" id="cam"><img id="video" alt="카메라"><div id="camHint" class="cam-hint hidden"></div></div>
+  </div>
+  <div id="player" class="modal hidden"><div class="modal-card"><div class="card-h"><h3 id="playerTitle">클립</h3><button class="btn ghost" id="playerClose">닫기</button></div><video id="playerVideo" controls playsinline></video></div></div>
+  <div id="alarmFx" class="alarm-fx hidden" aria-live="assertive"><div class="alarm-banner" id="alarmTxt"></div></div>
+  <div id="toasts" class="toasts"></div>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
