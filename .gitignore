@@ -1,0 +1,27 @@
+# colcon
+build/
+install/
+log/
+# ROBOTIS 원본 복제본 (README의 원본 주소·커밋 참고)
+src/open_manipulator/
+# 런타임 데이터: DB·영상·키·설정 (영상에 사람 얼굴이 담김)
+data/
+omx_data/
+*.db
+*.db-wal
+*.db-shm
+*.mp4
+*.mjpg
+secret.key
+settings.json
+# 모델·빌드 산출물 (기기 전용 엔진 포함)
+*.engine
+*.onnx
+*.pt
+*.so
+*.tmp
+# 파이썬
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
