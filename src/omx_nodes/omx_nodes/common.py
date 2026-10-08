@@ -16,6 +16,7 @@ import os
 import sys
 import threading
 import time
+from pathlib import Path
 
 import numpy as np
 import rclpy
@@ -45,6 +46,38 @@ log = logging.getLogger("node")
 
 def now():
     return time.monotonic()
+
+
+DEMO_LOCK = Path.home() / "omx-safety-demo" / "data" / "omx.lock"
+_held_locks = []
+
+
+def device_lock(*devices):
+    """실제 장치를 두 프로그램이 동시에 잡지 않게 (예: 같은 OpenRB 포트에 두 실행기가 목표를 보내는 일).
+    - 장치마다 배타 잠금: /run/user/<uid>/omx_<장치>.lock
+    - 백업 데모(omx-safety-demo)의 잠금 파일에는 공유 잠금: 데모가 켜져 있으면 이 노드가 시작하지 않고,
+      이 노드가 켜져 있으면 데모가 시작하지 않는다 (파일 내용은 건드리지 않는다).
+    잡지 못하면 이유를 남기고 종료한다 (launch·systemd 가 잠시 뒤 다시 시도한다)."""
+    import fcntl
+    base = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
+    if not base.is_dir():
+        base = Path("/tmp")
+    for dev in devices:
+        f = open(base / f"omx_{dev}.lock", "a")
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            logging.getLogger("lock").error("장치 %s 를 다른 OMX 프로그램이 쓰는 중 — 종료", dev)
+            sys.exit(2)
+        _held_locks.append(f)
+    if devices and DEMO_LOCK.exists():
+        f = open(DEMO_LOCK, "a")
+        try:
+            fcntl.flock(f, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except OSError:
+            logging.getLogger("lock").error("백업 데모(omx-safety-demo)가 실행 중 — 같은 장치를 쓰므로 종료")
+            sys.exit(2)
+        _held_locks.append(f)
 
 
 def shm_path(cfg, name):
