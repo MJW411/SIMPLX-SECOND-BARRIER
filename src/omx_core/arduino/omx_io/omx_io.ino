@@ -53,7 +53,10 @@ const int ANGLE_OPEN = 10;
 const unsigned long SERVO_MOVE_TIME = 600;   // 93° ↔ 10° 전체 이동 시간 (ms)
 const unsigned long SERVO_STEP_INTERVAL = SERVO_MOVE_TIME / abs(ANGLE_CLOSED - ANGLE_OPEN);
 
-const int FLAME_THRESHOLD = 100;              // 이 값보다 크면 불꽃 (시험 후 조정)
+// 불꽃 센서: 단품 수광 소자 + 풀다운 (불꽃이면 값이 커짐). 2026-10-08 실기에서 LED·조명 빛에 포화(1023)돼
+// 보류 → 끔. 센서를 다시 달면 true 로 바꾸고 올린다 (기준은 사용자 시험 스케치 값 300).
+const bool FLAME_ENABLED = false;
+const int FLAME_THRESHOLD = 300;              // 이 값보다 크면 불꽃
 const unsigned long FLAME_HOLD_TIME = 5000;   // 마지막 감지 후 화재 유지 (ms)
 const unsigned long FLAME_WARMUP = 2000;      // 전원 직후 화염 값이 0.5초쯤 300대에서 떨어진다(실측) → 그동안 무시
 const unsigned long FLAME_CONFIRM = 100;      // 기준을 이만큼 계속 넘어야 불꽃 (순간 튐 거르기)
@@ -238,7 +241,7 @@ void loop() {
   bool a = readDebounced(start);             // 투입 (젯슨이 출발 판단에 쓴다)
   bool b = readDebounced(arrive);            // 도착 (여기서 즉시 정지)
   flameValue = analogRead(PIN_FLAME);
-  bool high = flameValue > FLAME_THRESHOLD && now >= FLAME_WARMUP;
+  bool high = FLAME_ENABLED && flameValue > FLAME_THRESHOLD && now >= FLAME_WARMUP;
   if (high && !flameHigh) flameSince = now;
   flameHigh = high;
   if (high && now - flameSince >= FLAME_CONFIRM) { lastFlameTime = now; fireOn = true; }

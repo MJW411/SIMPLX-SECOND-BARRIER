@@ -133,10 +133,14 @@ class ExecutorProxy:
         return SimpleNamespace(q=np.array(m.q, float)) if m is not None and m.ok else None
 
     def current_q(self):
+        """실행기 current_q 와 같게: 그리퍼는 한계 안으로 (실제 위치가 끝까지 닫혀 한계를 살짝 넘을 때가 있다)."""
         st = self.state
         if st is None:
             raise RemoteError("로봇 상태 없음")
-        return st.q.copy()
+        q = st.q.copy()
+        lo, hi = self.node.cfg.limits["gripper_limits"]
+        q[5] = min(max(q[5], lo), hi)
+        return q
 
     def link_points(self):
         st = self.state

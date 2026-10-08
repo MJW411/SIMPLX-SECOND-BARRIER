@@ -103,16 +103,21 @@ class M:
         self.status = "running"
 
 
+sent_q = []
+
+
 def mv(q, name):
     calls.append(name)
+    sent_q.append(np.array(q, float))
     return M()
 
 
 fake_ex.move_joints = mv
-fake_ex.current_q = lambda: np.zeros(6)
-sm.home_q_fn = lambda: [0.0, -0.5, 0.3, 1.0, 0.0, 0.0]
+fake_ex.current_q = lambda: np.array([0.1, -1.5, 1.5, 1.5, 0.0, 0.3])
+sm.home_q_fn = lambda: [0.0, -0.5, 0.3, 1.0, 0.0, -0.02]      # 저장된 홈의 그리퍼 값이 한계 밖 (실기에서 거부된 경우)
 sm._fire_home()
 check(calls == ["fire_home"], "처음 한 번 보냄")
+check(abs(sent_q[0][5] - 0.3) < 1e-9 and abs(sent_q[0][1] + 0.5) < 1e-9, "화재 홈은 팔만 — 그리퍼는 지금 위치 유지")
 sm._fire_home()
 check(len(calls) == 1, "진행 중이면 다시 보내지 않음")
 sm.fire_homing.status = "cancelled"
