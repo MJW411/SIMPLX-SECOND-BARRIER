@@ -40,8 +40,8 @@ const int BRIGHTNESS = 80;
 const int GUIDE_PIXELS = 60;
 const float GUIDE_MAX = 0.35;                 // 물결 최대 밝기 비율
 const float GUIDE_WHITE = 0.20;               // 평상시 백색 밝기 비율 (은은하게)
-const float SPACING = 20.0;                   // 빛 덩어리 간격 (LED 개수)
-const float TAIL = 12.0;                      // 꼬리 길이
+const float SPACING = 6.0;                    // 빛 덩어리 간격 (LED 개수). 시험 스케치 20 → 6 (2026-10-08 사용자 조정)
+const float TAIL = 5.0;                       // 꼬리 길이 (SPACING 보다 작게, 2026-10-08 사용자 조정)
 const float HEAD_SOFT = 1.5;                  // 머리 앞쪽 번짐
 const float SPEED = 6.0;                      // 초당 이동 칸 수
 const float BASE_GLOW = 0.04;                 // 바닥 은은한 빛
@@ -91,7 +91,6 @@ unsigned long servoArriveTime = 0;
 float phase = 0;
 unsigned long lastFrame = 0;
 int guideMode = -1;                           // 0 = 백색, 1 = 화재 물결 (같은 백색은 다시 그리지 않는다)
-unsigned long lastRx = 0;
 
 uint32_t shownColor = 0xFFFFFFFF;            // 같은 색이면 show() 를 다시 부르지 않는다
 
@@ -154,10 +153,11 @@ void drawWave() {
 }
 
 // 대피 유도: 평상시 백색은 한 번만 그린다 (다시 show() 하지 않음). 화재 때만 물결을 15ms 마다 그린다.
-// 60개 show() 는 인터럽트를 약 1.8ms 끈다 → 젯슨 명령을 받는 중(바이트가 들어온 지 30ms 안)이거나
-// 서보가 움직이는 중에는 미룬다 (글자 깨짐·서보 떨림 방지). 화재 때 문이 열리는 0.6초 동안은 물결이 잠깐 멈춘다.
+// 60개 show() 는 인터럽트를 약 1.8ms 끈다(9600bps 에서 2글자 미만 → 수신 버퍼가 받아 둔다).
+// 글자가 막 들어와 있는 순간과 서보가 움직이는 중에만 한 번 건너뛴다 (시험 스케치처럼 부드럽게).
+// 화재 때 문이 열리는 0.6초 동안은 물결이 잠깐 멈춘다 (서보 떨림 방지, 시험 스케치와 같음).
 void updateGuide(bool fire, unsigned long now) {
-  if (servoAttached || Serial.available() || now - lastRx < 30) return;
+  if (servoAttached || Serial.available()) return;
   if (!fire) {
     if (guideMode != 0) {
       uint8_t w = 255 * GUIDE_WHITE;
@@ -193,7 +193,6 @@ void handleLine(const char* s) {
 void readSerial() {
   while (Serial.available()) {
     char ch = Serial.read();
-    lastRx = millis();
     if (ch == '\n' || ch == '\r') {
       line[lineLen] = 0;
       if (lineLen) handleLine(line);
