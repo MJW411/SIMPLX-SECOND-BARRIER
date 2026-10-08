@@ -1,7 +1,8 @@
 """입구 헬멧 게이트 — 모노 USB 카메라로 헬멧을 확인하면 출입문(아두이노 서보)을 연다.
 
 설계 (PROJECT_BRIEF 3-1):
-- 모노 카메라를 저프레임(기본 5fps)으로 받고, **화면에 움직임이 있을 때만** 추론한다.
+- 모노 카메라를 저프레임(기본 5fps)으로 받고, **화면에 움직임이 있을 때와 그 뒤 hold_sec(기본 3초)** 동안만 추론한다.
+  (2026-10-08 실기: 피규어를 놓고 손을 떼면 바로 '움직임 없음'이 돼 확인 횟수가 지워지고 박스가 사라졌다)
 - 모델: 사람 인식과 같은 통합 모델(v2: fall-down / helmet / human)을 다른 실행 통로(lane)로 같이 쓴다.
   클래스 번호는 모델마다 다르므로 이름으로 찾는다. 헬멧 판정에는 마스크가 필요 없어 만들지 않는다.
 - 판정 방식 (helmet.match):
@@ -50,6 +51,7 @@ class HelmetGate:
         self.last_frame = None
         self.last_infer_t = 0.0
         self._n = 0
+        self._last_motion = -1e9
         self._run = True
         self._resolve()
 
@@ -88,7 +90,11 @@ class HelmetGate:
                 # 작은 피규어도 잡히게 평균 차이가 아니라 '바뀐 화소 비율'로 본다 (80x60 중 0.5% ≈ 24화소)
                 moving = prev is None or np.count_nonzero(np.abs(small - prev) > 20) > 0.005 * small.size
                 prev = small
-                if not moving:                      # 움직임이 없으면 추론하지 않는다 (확인 횟수는 처음부터)
+                now = time.monotonic()
+                if moving:
+                    self._last_motion = now
+                # 움직임이 멈춘 뒤에도 잠시 더 본다: 들어와서 멈춰 선 사람(피규어)도 연속 확인이 끝나게
+                if now - self._last_motion > self.cfg["helmet"].get("hold_sec", 3.0):
                     self._n = 0
                     self.last_dets = []
                     if not self.wants_open():
