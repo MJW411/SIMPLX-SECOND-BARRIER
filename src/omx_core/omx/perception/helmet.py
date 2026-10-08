@@ -1,7 +1,8 @@
 """입구 헬멧 게이트 — 모노 USB 카메라로 헬멧을 확인하면 출입문(아두이노 서보)을 연다.
 
 설계 (PROJECT_BRIEF 3-1):
-- 모노 카메라를 저프레임(기본 5fps)으로 받고, **화면에 움직임이 있을 때와 그 뒤 hold_sec(기본 3초)** 동안만 추론한다.
+- 모노 카메라를 저프레임(기본 5fps)으로 받는다. always=true(피규어 시연)면 항상 추론하고, false 면
+  **화면에 움직임이 있을 때와 그 뒤 hold_sec(기본 3초)** 동안만 추론한다 (실제 사람은 움직이며 들어오므로 GPU 절약).
   (2026-10-08 실기: 피규어를 놓고 손을 떼면 바로 '움직임 없음'이 돼 확인 횟수가 지워지고 박스가 사라졌다)
 - 모델: 사람 인식과 같은 통합 모델(v2: fall-down / helmet / human)을 다른 실행 통로(lane)로 같이 쓴다.
   클래스 번호는 모델마다 다르므로 이름으로 찾는다. 헬멧 판정에는 마스크가 필요 없어 만들지 않는다.
@@ -91,7 +92,7 @@ class HelmetGate:
                 moving = prev is None or np.count_nonzero(np.abs(small - prev) > 20) > 0.005 * small.size
                 prev = small
                 now = time.monotonic()
-                if moving:
+                if moving or self.cfg["helmet"].get("always", False):    # always: 피규어 시연 — 가만히 서 있어도 계속 판정
                     self._last_motion = now
                 # 움직임이 멈춘 뒤에도 잠시 더 본다: 들어와서 멈춰 선 사람(피규어)도 연속 확인이 끝나게
                 if now - self._last_motion > self.cfg["helmet"].get("hold_sec", 3.0):
