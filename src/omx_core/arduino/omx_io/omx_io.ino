@@ -38,7 +38,7 @@ const int BRIGHTNESS = 80;
 
 // 대피 유도 물결 (사용자 시험 스케치 값 바탕)
 const int GUIDE_PIXELS = 60;
-const float GUIDE_MAX = 0.35;                 // 물결 최대 밝기 비율
+const float GUIDE_MAX = 0.80;                 // 물결 최대 밝기 비율 (시험 스케치 0.35 → 0.80, 2026-10-08 사용자: 더 밝게)
 const float GUIDE_WHITE = 0.20;               // 평상시 백색 밝기 비율 (은은하게)
 const float SPACING = 6.0;                    // 빛 덩어리 간격 (LED 개수). 시험 스케치 20 → 6 (2026-10-08 사용자 조정)
 const float TAIL = 5.0;                       // 꼬리 길이 (SPACING 보다 작게, 2026-10-08 사용자 조정)
