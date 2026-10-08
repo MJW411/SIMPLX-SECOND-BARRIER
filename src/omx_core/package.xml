@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>omx_core</name>
+  <version>0.1.0</version>
+  <description>OMX 세컨드 배리어 핵심 라이브러리 (인식·안전 판단·로봇 실행기·장치·녹화·DB·웹). ROS 의존 없음</description>
+  <maintainer email="206329414+MJW411@users.noreply.github.com">MJW411</maintainer>
+  <license>Proprietary</license>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>python3-serial</exec_depend>
+  <exec_depend>dynamixel_sdk</exec_depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

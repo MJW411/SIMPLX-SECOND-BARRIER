@@ -75,7 +75,7 @@ recording:
   limits: {pre_max: 50, post_max: 120}
 
 storage:
-  data_dir: data
+  # 데이터 폴더는 OMX_DATA_DIR 환경 변수로 정한다 (없으면 ~/omx_data). 시험은 임시 폴더를 지정.
   budget_ratio: 0.50       # SSD 전체 용량 대비 데이터 예산
 
 conveyor:

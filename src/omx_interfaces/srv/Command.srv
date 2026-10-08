@@ -1,0 +1,7 @@
+# 노드별 관리 명령 (웹 제어판 → 각 노드). 인자·결과는 JSON
+string cmd
+string args_json
+---
+bool ok
+string message
+string result_json

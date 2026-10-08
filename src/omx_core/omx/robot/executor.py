@@ -105,6 +105,7 @@ class Executor:
         self.slow_after_stop = False
         self.scale_now = 0.0
         self.comm_fail = 0
+        self.write_fail = 0              # 목표 쓰기 연속 실패 (읽기 성공이 이 값을 지우지 않게 따로 센다)
         self.track_t0 = None
         self.load_t0 = None
         self.stall_t0 = np.full(5, np.nan)
@@ -152,6 +153,14 @@ class Executor:
             self.speed_ratio = float(min(max(ratio, 0.01), self.L["speed_cap_ratio"]))
         return self.speed_ratio
 
+    def _goal_here(self):
+        """지금 자세를 목표로. 단 그리퍼는 직전 목표를 유지한다 — 전류 기반 그리퍼는 목표가 실제 위치(물체에 막힌 곳)와
+        같아지면 조이는 힘이 사라져 쥔 물체가 미끄러진다 (복구·토크 켜기·직접 교시 끝날 때)."""
+        g = self.state.q.copy()
+        if self.goal is not None:
+            g[5] = self.goal[5]
+        return g
+
     def set_torque(self, on, force=False):
         with self.lock:
             if on:
@@ -159,7 +168,7 @@ class Executor:
                     raise LimitError(f"로봇 고장: {self.fault}")
                 self.bus.torque(True)
                 self.state = self.bus.read_state()
-                self.goal = self.state.q.copy()
+                self.goal = self._goal_here()
                 self.torque_on = True
                 self.on_event("robot", "토크 켜짐")
             else:
@@ -195,7 +204,7 @@ class Executor:
                     return
                 self.bus.torque_subset(range(5), True)
                 self.state = self.bus.read_state()
-                self.goal = self.state.q.copy()
+                self.goal = self._goal_here()
                 self.freedrive = False
                 self.torque_on = True
                 log.info("freedrive off at %s", np.round(self.state.q, 3).tolist())
@@ -237,13 +246,14 @@ class Executor:
             self.estop = False
             self.fault = ""
             self.comm_fail = 0
+            self.write_fail = 0
             self._cancel("고장 해제")
             self.jog = None
             if msgs or not all(tq):
                 self.torque_on = False                  # 관리자가 다시 토크를 켠다
                 self.goal = self.state.q.copy() if any(tq) else None
             elif self.torque_on:
-                self.goal = self.state.q.copy()
+                self.goal = self._goal_here()
         if msgs:
             self.on_event("robot", "고장 해제: " + ", ".join(msgs) + " — 토크 다시 켜기 필요")
         return ", ".join(msgs) or "해제 완료"
@@ -562,9 +572,11 @@ class Executor:
         # 5) 목표 보내기 (자리 유지 중에도 계속 보낸다)
         try:
             self.bus.write_goal(self.goal)
+            self.write_fail = 0
         except BusError as e:
-            self.comm_fail += 1
-            if self.comm_fail >= self.L["comm_fail_max"]:
+            self.write_fail += 1
+            self.comm_fail = max(self.comm_fail, self.write_fail)
+            if self.write_fail >= self.L["comm_fail_max"]:
                 self._set_fault(f"통신 오류: {e}")
 
     def _jog_step(self, now):

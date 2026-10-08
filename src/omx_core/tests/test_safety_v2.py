@@ -1,0 +1,202 @@
+"""2026-10-08 수정 사항 시험: 모델 준비·프레임 시각 신선도·낙상·재가동 구역 검사·화재 홈 재시도,
+그리퍼 목표 유지·쓰기 실패 고장·작업 정지 경합."""
+import sys
+import threading
+import time
+from pathlib import Path
+from types import SimpleNamespace
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from omx.config import Config  # noqa: E402
+from omx.perception.people import Percept, Person  # noqa: E402
+from omx.robot.dxl_bus import BusError, SimBus  # noqa: E402
+from omx.robot.executor import Executor  # noqa: E402
+from omx.robot.task import CycleRunner  # noqa: E402
+from omx.safety.manager import SafetyManager  # noqa: E402
+
+C = Config()
+fails = []
+
+
+def check(c, what):
+    print(("  OK   " if c else "  FAIL ") + what)
+    if not c:
+        fails.append(what)
+
+
+# ------------------------------------------------------------------ 안전 관리자
+emitted = []
+fake_ex = SimpleNamespace(fault="", estop=False, torque_on=True, cfg=C["robot"], permit=lambda *a: None,
+                          stop_motion=lambda *a: None, emergency_stop=lambda: None)
+fake_io = SimpleNamespace(fire=lambda: False, healthy=lambda: True, health_msg=lambda: "", set_door=lambda *a: None)
+fake_per = SimpleNamespace(latest=None, cam=SimpleNamespace(error=""))
+sm = SafetyManager(C, fake_ex, fake_per, fake_io, SimpleNamespace(emit=lambda t, *a, **k: emitted.append(t)))
+seq = [0]
+STOP = sm.profile()["stop"]
+
+
+def person(dist, fallen=False, in_zone=True, x=320):
+    return Person(box=(x - 20, 200, x + 20, 300), conf=0.9, px=(x, 250), pos=np.array([0.3, 0.0, 0.0]),
+                  dist=dist, cam_dist=dist, in_zone=in_zone, name="fall-down" if fallen else "human", fallen=fallen)
+
+
+def feed(persons=(), n=1, ready=True, t=None):
+    for _ in range(n):
+        seq[0] += 1
+        ps = list(persons)
+        zd = [p.dist for p in ps if p.in_zone]
+        fake_per.latest = (None, Percept(time.monotonic() if t is None else t, seq[0], persons=ps,
+                                         min_dist=min(zd) if zd else float("inf"), model_ready=ready))
+        sm._step()
+
+
+print("[인식 모델 준비]")
+feed(n=3)
+sm.restart()
+check(not sm.stop_latched, "정상 시작")
+feed(n=2, ready=False)
+check(sm.stop_latched.startswith("인식 모델 없음") and sm.state == "STOP", f"모델 없음 → 고장 정지 ({sm.stop_latched})")
+ok, probs = sm.restart()
+check(not ok and any("모델" in p for p in probs), f"모델 없으면 재가동 불가 {probs}")
+feed(n=2)
+ok, _ = sm.restart()
+check(ok, "모델이 준비되면 재가동 가능")
+
+print("[프레임 시각 신선도]")
+feed(n=1, t=time.monotonic() - 2.0)          # 2초 전에 찍은 프레임이 이제 도착
+sm._step()
+check(sm.stop_latched.startswith("인식 멈춤"), f"늦게 도착한 오래된 프레임 → 인식 멈춤 정지 ({sm.stop_latched})")
+feed(n=2)
+sm.restart()
+
+print("[낙상: 알림만, 정지는 거리로]")
+emitted.clear()
+far = STOP * 20
+feed([person(far, fallen=True)], n=C["safety"]["fall_confirm_frames"] + 2)
+check("person_fall" in emitted, "넘어진 사람이 계속 보이면 낙상 이벤트")
+check(not sm.stop_latched and sm.state in ("NORMAL", "SLOW"), f"구역 밖·먼 낙상만으로는 정지하지 않음 ({sm.state})")
+check(emitted.count("person_fall") == 1, "낙상 이벤트는 한 번만")
+feed([person(STOP * 0.5, fallen=True)], n=4)
+check(sm.state == "STOP" and sm.stop_latched.startswith("사람 근접"), f"넘어진 사람이 정지 거리 안 → 정지 ({sm.stop_latched})")
+feed(n=40)
+check(not sm.fallen, "넘어진 사람이 안 보이면 낙상 상태 해제")
+
+print("[재가동: 근접 판정 해제 전에는 안 됨]")
+check(len(sm.vanish.pending) + len(sm.vanish.unresolved) > 0, "출구가 아닌 곳에서 사라진 사람 → 사라짐 판정 (설계대로)")
+sm.clear_vanish()
+sm.zone = "STOP"
+sm.min_dist = 99.0
+ok, probs = sm.restart()
+check(not ok and any("근접 판정" in p for p in probs), f"거리는 멀지만 판정이 아직 STOP → 거부 {probs}")
+feed(n=4)
+ok, probs = sm.restart()
+check(ok, f"판정이 해제되면 재가동 {probs}")
+
+print("[화재 홈 복귀: 취소되면 다시 시도]")
+calls = []
+
+
+class M:
+    def __init__(self):
+        self.status = "running"
+
+
+def mv(q, name):
+    calls.append(name)
+    return M()
+
+
+fake_ex.move_joints = mv
+fake_ex.current_q = lambda: np.zeros(6)
+sm.home_q_fn = lambda: [0.0, -0.5, 0.3, 1.0, 0.0, 0.0]
+sm._fire_home()
+check(calls == ["fire_home"], "처음 한 번 보냄")
+sm._fire_home()
+check(len(calls) == 1, "진행 중이면 다시 보내지 않음")
+sm.fire_homing.status = "cancelled"
+sm._fire_retry_t -= 3
+sm._fire_home()
+check(len(calls) == 2, "취소되면 2초 뒤 다시 보냄")
+
+# ------------------------------------------------------------------ 실행기
+print("[그리퍼 목표 유지]")
+bus = SimBus()
+ex = Executor(bus, C["robot"], C.limits, on_event=lambda *a: None)
+ex.start()
+ex.set_torque(True)
+ex.goal[5] = 0.2                       # 물체를 쥔 상태: 목표가 실제보다 더 닫힌 쪽
+bus.state.q[5] = 0.45
+ex.emergency_stop()
+ex.reset()
+check(abs(ex.goal[5] - 0.2) < 1e-9, f"고장 해제 후 그리퍼 목표 유지 ({ex.goal[5]:.2f})")
+ex.set_torque(True)
+check(abs(ex.goal[5] - 0.2) < 1e-9, "토크 켜기 후 그리퍼 목표 유지")
+
+print("[쓰기 실패 반복 → 통신 고장]")
+orig = bus.write_goal
+
+
+def bad_write(q):
+    raise BusError("쓰기 실패 시험")
+
+
+bus.write_goal = bad_write
+t_end = time.monotonic() + 2.0
+while not ex.fault and time.monotonic() < t_end:
+    time.sleep(0.02)
+check(ex.fault.startswith("통신 오류"), f"읽기는 되고 쓰기만 계속 실패 → 고장 ({ex.fault})")
+bus.write_goal = orig
+ex.reset()
+
+print("[작업 정지 직후 다음 동작이 나가지 않음]")
+ex.set_torque(True)
+ex.permit(1.0)
+sent = []
+
+
+class FakeEx:
+    def __init__(self):
+        self.state = SimpleNamespace(q=np.zeros(6))
+
+    def current_q(self):
+        return np.zeros(6)
+
+    def stop_motion(self):
+        pass
+
+    def move_joints(self, q, name, speed_scale=1.0):
+        sent.append(name)
+        m = SimpleNamespace(name=name, status="done", reason="", wait=lambda t=None: "done")
+        return m
+
+
+gate = threading.Event()
+release = threading.Event()
+teach = SimpleNamespace(snapshot=lambda: {"sequence": [{"type": "move", "pose": "a"}, {"type": "move", "pose": "b"}],
+                                          "gripper": {}},
+                        pose_q=lambda n: [0.0] * 6, home_q=lambda: None)
+cr = CycleRunner(FakeEx(), teach, None, SimpleNamespace(emit=lambda *a, **k: None), C.limits)
+orig_wait = cr._wait
+
+
+def slow_wait(m):
+    orig_wait(m)
+    gate.set()                         # 첫 단계 끝: 여기서 정지 명령이 끼어든다
+    release.wait(2.0)
+
+
+cr._wait = slow_wait
+cr.start()
+gate.wait(2.0)
+cr.stop("시험")
+release.set()
+cr.thread.join(2.0)
+check(sent == ["move a"], f"정지 뒤 다음 단계 동작을 보내지 않음 ({sent})")
+check(cr.status.startswith("정지"), f"상태: {cr.status}")
+
+ex.shutdown()
+print()
+print("실패 %d건" % len(fails) if fails else "모두 통과")
+sys.exit(1 if fails else 0)
