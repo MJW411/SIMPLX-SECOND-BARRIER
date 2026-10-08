@@ -1,0 +1,7 @@
+# OMX 세컨드 배리어 전체 (노드 5개). 부팅해도 로봇은 정지 상태로 시작한다.
+[Unit]
+Description=OMX 세컨드 배리어
+Wants=omx-robot.service omx-safety.service omx-io.service omx-perception.service omx-web.service
+
+[Install]
+WantedBy=default.target

@@ -300,7 +300,8 @@ function render() {
   const bar = (label, pct, txt) => `<div class="barrow"><span>${label}</span><div class="bar"><i class="${pct > 85 ? "hot" : pct > 65 ? "mid" : ""}" style="width:${Math.min(100, pct || 0)}%"></i></div><span>${txt}</span></div>`;
   $("#sysBars").innerHTML = bar("CPU", sy.cpu, `${sy.cpu ?? "—"}%`) + bar("GPU", sy.gpu, `${sy.gpu ?? "—"}%`) +
     bar("RAM", sy.ram_total_gb ? 100 * sy.ram_used_gb / sy.ram_total_gb : 0, `${sy.ram_used_gb ?? "—"} GB`);
-  kv("#sysKv", { "이 프로그램": `${sy.proc_rss_mb} MB · CPU ${sy.proc_cpu}%`,
+  const nodes = Object.entries(sy.nodes || {}).map(([k, v]) => `${esc(k)} ${v.mb}MB·${v.cpu}%`).join(" · ");
+  kv("#sysKv", { "이 프로그램": `${sy.proc_rss_mb} MB · CPU ${sy.proc_cpu}%`, ...(nodes ? { "노드별": nodes } : {}),
     "온도": Object.entries(sy.temp || {}).map(([k, v]) => `${k} ${v}°C`).join(" · "), "로봇 연결": esc(S.robot_backend) });
 }
 

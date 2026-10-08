@@ -1,0 +1,17 @@
+[Unit]
+Description=OMX io 노드
+PartOf=omx.target
+After=omx-robot.service
+
+[Service]
+Type=simple
+Environment=OMX_DATA_DIR=%h/omx_data
+Environment=ROS_LOCALHOST_ONLY=1
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash && source %h/ros2_ws/install/setup.bash && exec %h/ros2_ws/.venv/bin/python -m omx_nodes.io_node'
+Restart=on-failure
+RestartSec=3
+# 웹 제어판의 '재시작'은 omx.target 을 다시 시작한다
+
+[Install]
+WantedBy=omx.target

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>omx_nodes</name>
+  <version>0.1.0</version>
+  <description>OMX 세컨드 배리어 ROS 2 노드 5개: perception / safety / robot / io / web</description>
+  <maintainer email="206329414+MJW411@users.noreply.github.com">MJW411</maintainer>
+  <license>Proprietary</license>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>omx_core</exec_depend>
+  <exec_depend>omx_interfaces</exec_depend>
+  <exec_depend>python3-psutil</exec_depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
