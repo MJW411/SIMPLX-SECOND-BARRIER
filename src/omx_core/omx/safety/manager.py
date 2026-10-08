@@ -349,12 +349,17 @@ class SafetyManager:
         if self.fire_homing is not None or not ex.torque_on or ex.fault or ex.estop:
             return
         self._fire_retry_t = time.monotonic()
+        cur = ex.current_q()
         q = self.home_q_fn()
         if q is None:
-            q = list(ex.cfg["rest_pose"]) + [ex.current_q()[5]]
-            q[0] = ex.current_q()[0]
+            q = list(ex.cfg["rest_pose"]) + [cur[5]]
+            q[0] = cur[0]
+        q = np.array(q, float)
+        # 자세는 팔만 — 그리퍼는 지금 위치 그대로 (쥔 물체 유지). 저장된 홈의 그리퍼 값이 한계를 살짝 벗어나
+        # 화재 홈 복귀 전체가 거부되던 문제 (2026-10-08 실기: gripper=-0.02)
+        q[5] = cur[5]
         try:
-            self.fire_homing = ex.move_joints(np.array(q, float), "fire_home")
+            self.fire_homing = ex.move_joints(q, "fire_home")
         except Exception as e:
             self.fire_homing = False
             self.events.emit("fault", f"화재 홈 복귀 실패: {e}", level="alarm")
