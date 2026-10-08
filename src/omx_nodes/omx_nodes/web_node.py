@@ -67,7 +67,11 @@ class SysMon:
     def _loop(self):
         n = 0
         while True:
-            if not self.active_fn():
+            try:
+                active = self.active_fn()
+            except Exception:
+                active = True
+            if not active:
                 time.sleep(1.0)
                 continue
             if n % 5 == 0:
@@ -119,6 +123,7 @@ class WebNode(OmxNode):
         if stuck or orphan:
             self.log.info("시작 정리: 녹화 중에 멈춘 이벤트 %d건 → 실패, DB 에 없는 영상 %d개 삭제", stuck, orphan)
         self.state_t = 0.0                         # 마지막 /api/state 직접 조회
+        self.ws_clients = 0
         self.sysmon = SysMon(lambda: self.ws_clients > 0 or time.monotonic() - self.state_t < 10.0)
         self.listeners = []
         self.io = IoProxy(self)
@@ -132,7 +137,6 @@ class WebNode(OmxNode):
         self.create_subscription(ClipStatus, "/omx/clip_status", self._clip, QOS_DURABLE, callback_group=self.cb)
         self.estop_pub = self.create_publisher(Empty, "/omx/estop", QOS_CMD)
         self.viewers = 0
-        self.ws_clients = 0
         self.vlock = threading.Lock()
         self.viewers_pub = self.create_publisher(Int32, "/omx/web/viewers", QOS_LATEST)
         self.clients_pub = self.create_publisher(Int32, "/omx/web/clients", QOS_LATEST)
