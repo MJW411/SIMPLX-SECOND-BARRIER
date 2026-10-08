@@ -25,3 +25,4 @@ __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
+src/omx_core/arduino/.arduino-user/
