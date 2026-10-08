@@ -54,6 +54,11 @@ class SafetyManager:
         self.guard_person_m = 0.0
         self.brightness = 255.0
         self._dark_t0 = None               # 무인 시험 보호: 보정과 무관하게 카메라 거리 이 안의 사람이면 정지
+        self.model_ready = True            # 사람을 볼 수 있는 모델이 올라와 있는가 (인식 결과에 실려 온다)
+        self.fallen = False                # 낙상 확정 상태 (알림·녹화만, 정지 판단에는 쓰지 않음)
+        self._fall_n = 0
+        self._fall_clear_n = 0
+        self._fire_retry_t = 0.0
         self._run = True
         self.thread = threading.Thread(target=self._loop, name="safety", daemon=True)
 
@@ -93,8 +98,14 @@ class SafetyManager:
             p.append("사라짐 판정 중")
         if self.min_dist < prof["clear"]:
             p.append(f"사람이 아직 가까움 ({self.min_dist:.2f} m, 기준 {prof['clear']:.2f} m)")
+        elif self.zone != "CLEAR":
+            # 거리는 멀어졌지만 근접 판정이 아직 해제되지 않음 (해제는 연속 3프레임 확인). 여기서 풀면
+            # 사람이 바로 다시 들어올 때 새 정지가 걸리지 않고, 나가면 저절로 다시 움직인다.
+            p.append("사람 근접 판정이 아직 해제되지 않음 — 잠시 후 다시")
         if self._perception_stale():
             p.append("인식 멈춤 또는 카메라 고장")
+        if not self.model_ready:
+            p.append("인식 모델이 준비되지 않음")
         if self._dark_t0 is not None:
             p.append(f"조명이 어두움 (밝기 {self.brightness:.0f})")
         if not self.io.healthy():
@@ -200,12 +211,17 @@ class SafetyManager:
             if lat is not None and lat[1].seq != self.last_percept_seq:
                 f, pc = lat
                 self.last_percept_seq = pc.seq
-                self.last_percept_t = now
+                # 신선도는 받은 시각이 아니라 프레임을 찍은 시각으로 본다 (추론이 느려지면 그만큼 늦은 정보다)
+                self.last_percept_t = min(now, getattr(pc, "t", now))
                 self.brightness = pc.brightness
+                self.model_ready = getattr(pc, "model_ready", True)
                 if not self.teach_mode:             # 티칭 모드: 사람 감지·어두움 판정 안 함
                     self._judge_people(pc, now, prof, s)
             if self._perception_stale() and not self.teach_mode:
                 self._latch("인식 멈춤 또는 카메라 고장 — 고장 정지", "fault")
+            if not self.model_ready and not self.teach_mode:
+                # 모델을 못 불러왔거나 사람 클래스가 없는 모델: 사람이 있어도 '없음'으로 보이므로 정지
+                self._latch("인식 모델 없음(불러오기 실패) — 고장 정지", "fault")
             if not self.io.healthy():
                 self._latch(f"장치 통신 고장 — {self.io.health_msg()}", "fault")
             if self.ex.fault:
@@ -261,6 +277,7 @@ class SafetyManager:
                 self._latch(f"조명이 어두워 사람 인식 불가 — 고장 정지 (밝기 {pc.brightness:.0f})", "fault")
         else:
             self._dark_t0 = None
+        self._judge_fall(pc, s)
         new_v = self.vanish.update(pc, now)
         for v in new_v:
             self._latch_vanish(v)
@@ -282,6 +299,24 @@ class SafetyManager:
             if cand == "STOP":
                 self.human_alarm = True       # 이미 다른 이유로 멈춰 있어도 사람 근접은 화면에 알린다
                 self._latch(f"사람 근접으로 정지 ({d:.2f} m)", "human_stop")
+
+    def _judge_fall(self, pc, s):
+        """낙상: 넘어진 사람이 연속 N프레임 보이면 알림·녹화(한 번). 정지는 걸지 않는다 —
+        넘어진 사람도 사람이므로 구역 안이면 거리 판정으로 똑같이 감속·정지된다 (2026-10-08 사용자 결정)."""
+        if any(getattr(p, "fallen", False) for p in pc.persons):
+            self._fall_n += 1
+            self._fall_clear_n = 0
+            if not self.fallen and self._fall_n >= s.get("fall_confirm_frames", 10):
+                self.fallen = True
+                inz = any(getattr(p, "fallen", False) and p.in_zone for p in pc.persons)
+                self.events.emit("person_fall", "작업자 낙상 감지" + (" (감시 구역 안)" if inz else ""),
+                                 level="alarm", clip=True)
+        else:
+            self._fall_n = 0
+            self._fall_clear_n += 1
+            if self.fallen and self._fall_clear_n >= s.get("fall_clear_frames", 30):
+                self.fallen = False
+                self.events.emit("person_fall_end", "낙상 상태 해제 (넘어진 사람이 더 이상 보이지 않음)", level="info")
 
     def _latch_vanish(self, v):
         self.stop_latched = self.stop_latched or "사라짐으로 정지 — 현장 확인 필요"
@@ -307,8 +342,13 @@ class SafetyManager:
     def _fire_home(self):
         """화재 중 홈 복귀 명령 (한 번만). 홈이 없으면 휴식 자세."""
         ex = self.ex
+        if self.fire_homing not in (None, False) and getattr(self.fire_homing, "status", "") == "cancelled":
+            # 정지 명령 등으로 취소된 홈 복귀는 다시 시도한다 (2초 간격)
+            if time.monotonic() - self._fire_retry_t > 2.0:
+                self.fire_homing = None
         if self.fire_homing is not None or not ex.torque_on or ex.fault or ex.estop:
             return
+        self._fire_retry_t = time.monotonic()
         q = self.home_q_fn()
         if q is None:
             q = list(ex.cfg["rest_pose"]) + [ex.current_q()[5]]
@@ -340,4 +380,6 @@ class SafetyManager:
                 "restart_blockers": self.restart_blockers() if self.stop_latched else [],
                 "guard_person_m": self.guard_person_m,
                 "brightness": round(self.brightness),
+                "model_ready": self.model_ready,
+                "fallen": self.fallen,
             }

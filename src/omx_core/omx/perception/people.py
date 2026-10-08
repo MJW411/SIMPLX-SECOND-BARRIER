@@ -49,6 +49,8 @@ class Person:
     poly: np.ndarray = None
     overlap: float = 0.0         # 로봇 모습과 겹친 비율 (진단용)
     near: float = 0.0            # 로봇 표면 4 cm 안 점 비율 (진단용)
+    name: str = "person"         # 검출 클래스 이름 (human / fall-down / person)
+    fallen: bool = False         # 넘어진 사람 (낙상 알림·표시용 — 정지 판단은 다른 사람과 똑같이 거리로만)
 
 
 @dataclass
@@ -61,6 +63,7 @@ class Percept:
     infer_ms: float = 0.0
     shape: tuple = (480, 640)
     brightness: float = 255.0    # 영상 평균 밝기 (조도 부족이면 인식을 믿을 수 없다)
+    model_ready: bool = True     # 사람을 볼 수 있는 모델이 올라와 있는가 (아니면 안전 관리자가 고장 정지)
 
 
 def link_distance(P, links):
@@ -94,6 +97,9 @@ class PeoplePerception:
         self.calib_valid = calib.T_base_cam is not None if calib is not None else False
         self.calib_fit = None
         self.fps = 0.0
+        self._cls_key = None
+        self._cls_ids, self._fallen_ids = [], set()
+        self._Ti = (None, None)
         self._run = True
         self.thread = threading.Thread(target=self._loop, name="people", daemon=True)
 
@@ -105,9 +111,8 @@ class PeoplePerception:
         last = -1
         n, t0 = 0, time.monotonic()
         while self._run:
-            f = self.cam.latest()
-            if f is None or f.seq == last:
-                time.sleep(0.005)
+            f = self.cam.wait_new(last, timeout=0.5)       # 새 프레임이 올 때까지 잠든다 (5 ms 폴링 대신)
+            if f is None:
                 continue
             last = f.seq
             try:
@@ -123,6 +128,20 @@ class PeoplePerception:
             if time.monotonic() - t0 >= 2.0:
                 self.fps = n / (time.monotonic() - t0)
                 n, t0 = 0, time.monotonic()
+
+    def person_classes(self):
+        """사람으로 볼 클래스 번호와 모델 준비 여부. 번호는 모델마다 다르므로 이름으로 찾는다
+        (v2: human·fall-down, COCO: person). 넘어진 사람도 사람이다 — 거리·사라짐·재가동 검사에 모두 들어간다."""
+        pc = self.cfg["perception"]
+        key = (self.det.model_name, id(self.det.names))
+        if key != self._cls_key:
+            names = pc.get("person_classes") or ["person"]
+            self._cls_ids = self.det.class_ids(names)
+            self._fallen_ids = set(self.det.class_ids(pc.get("fallen_classes", ["fall-down"])))
+            self._cls_key = key
+            if self.det.ready and not self._cls_ids:
+                log.error("사람 클래스(%s)가 없는 모델: %s", names, self.det.names)
+        return self._cls_ids, bool(self.det.ready and self._cls_ids)
 
     def robot_mask(self, img):
         """로봇(주황색 OMX) 픽셀 마스크. 로봇 팔이 사람으로 오검출되는 것을 막는다.
@@ -169,7 +188,9 @@ class PeoplePerception:
     def _fk_silhouette(self, shape, T, links):
         """영상 속 로봇 모습: FK 링크를 실제 폭(반경+1 cm, 그리퍼는 더 넓게)으로 투영한 마스크."""
         intr = self.cam.intr
-        Ti = np.linalg.inv(T)
+        if self._Ti[0] is not T:                    # 보정이 바뀔 때만 역행렬을 다시 구한다
+            self._Ti = (T, np.linalg.inv(T))
+        Ti = self._Ti[1]
         P = links @ Ti[:3, :3].T + Ti[:3, 3]
         m = np.zeros(shape[:2], np.uint8)
         radii = [0.035] + list(LINK_RADII[:-1] + 0.01) + [0.035]      # 베이스, 링크들, 그리퍼
@@ -188,7 +209,8 @@ class PeoplePerception:
         if now - getattr(self, "_calib_check_t", 0) > 1.0:
             self._calib_check_t = now
             self.check_calibration(f)
-        dets = self.det.infer(f.color, classes=[pc["person_class"]])
+        ids, ready = self.person_classes()
+        dets = self.det.infer(f.color, classes=ids) if ready else []
         rmask = self.robot_mask(f.color) if dets else None
         self.robot_rejects = getattr(self, "robot_rejects", 0)
         intr = self.cam.intr
@@ -196,13 +218,15 @@ class PeoplePerception:
         links = self.link_points() if T is not None else None
         sil = self._fk_silhouette(f.color.shape, T, links) if (dets and T is not None and links is not None
                                                                 and self.cam.intr is not None) else None
-        out = Percept(f.t, f.seq, calibrated=T is not None, infer_ms=self.det.infer_ms, shape=f.color.shape[:2])
+        out = Percept(f.t, f.seq, calibrated=T is not None, infer_ms=self.det.infer_ms, shape=f.color.shape[:2],
+                      model_ready=ready)
         out.brightness = float(f.color[::8, ::8].mean())
         zone = self.cfg["safety"]["zone_base"]
         frac_max = pc.get("robot_filter", {}).get("max_frac", 0.25)
         for d in dets:
             x1, y1, x2, y2 = d.box
-            per = Person(d.box, d.conf, ((x1 + x2) / 2, (y1 + y2) / 2), poly=d.poly)
+            per = Person(d.box, d.conf, ((x1 + x2) / 2, (y1 + y2) / 2), poly=d.poly, name=d.name,
+                         fallen=d.cls in self._fallen_ids)
             m = det_mask(d, f.color.shape)
             area = max(1, nnz(m))
             overlap = nnz(m & sil) / area if sil is not None else 0.0

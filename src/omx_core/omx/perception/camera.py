@@ -37,6 +37,7 @@ class Frame:
 class _Base:
     def __init__(self):
         self.lock = threading.Lock()
+        self.cond = threading.Condition(self.lock)   # 새 프레임 알림 (소비자가 짧은 주기로 확인하지 않도록)
         self.frame = None
         self.seq = 0
         self.intr = None
@@ -57,11 +58,19 @@ class _Base:
         with self.lock:
             return self.frame
 
+    def wait_new(self, last_seq, timeout=0.5):
+        """last_seq 보다 새 프레임이 올 때까지 잠든 채 기다린다. 시간이 지나면 None."""
+        with self.cond:
+            self.cond.wait_for(lambda: self.frame is not None and self.frame.seq != last_seq, timeout)
+            f = self.frame
+        return f if f is not None and f.seq != last_seq else None
+
     def _publish(self, color, depth=None, scale=0.001):
         self.seq += 1
         f = Frame(self.seq, time.monotonic(), color, depth, scale)
-        with self.lock:
+        with self.cond:
             self.frame = f
+            self.cond.notify_all()
         for cb in self.listeners:
             try:
                 cb(f)

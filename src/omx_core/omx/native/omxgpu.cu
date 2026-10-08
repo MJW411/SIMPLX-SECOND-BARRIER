@@ -19,7 +19,7 @@ struct OgCtx {
     uint8_t* d_img;        // 원본 BGR
     size_t img_cap;
     int* d_count;          // 후보 수
-    float* d_cand;         // 후보: [anchor, cx,cy,w,h, score, coef x nm] x MAX_CAND
+    float* d_cand;         // 후보: [anchor, cx,cy,w,h, score, cls, coef x nm] x MAX_CAND
     float* d_coef;         // 마스크용 계수 (k x nm)
     float* d_box;          // 마스크용 박스 (프로토 좌표 x1,y1,x2,y2) (k x 4)
     uint8_t* d_mask;       // k x ph x pw
@@ -41,7 +41,7 @@ void* og_create(int imgsz, int n_anchor, int nc, int nm, int ph, int pw, int fp1
     memset(c, 0, sizeof(*c));
     c->imgsz = imgsz; c->n_anchor = n_anchor; c->nc = nc; c->nm = nm; c->ph = ph; c->pw = pw;
     c->fp16 = fp16; c->max_masks = max_masks;
-    int stride = 6 + nm;
+    int stride = 7 + nm;
     if (cudaMalloc(&c->d_count, sizeof(int)) ||
         cudaMalloc(&c->d_cand, sizeof(float) * stride * MAX_CAND) ||
         cudaMalloc(&c->d_coef, sizeof(float) * nm * max_masks) ||
@@ -121,33 +121,41 @@ extern "C" int og_preprocess(void* p, const uint8_t* img, int w, int h, void* d_
 }
 
 // ---------------------------------------------------------------- 후보 고르기
-// pred: (4 + nc + nm, N) 행 우선. 한 클래스 점수만 본다(사람). 순서는 GPU 원자 연산 순서라 섞이므로
-// 파이썬에서 앵커 번호로 다시 정렬한다(기존 numpy 결과와 같은 순서 → 같은 NMS 결과).
+// pred: (4 + nc + nm, N) 행 우선. cls_mask 에 켜진 클래스들 중 최고 점수를 본다 (예: human + fall-down).
+// numpy 경로와 같다: 고른 클래스 밖의 점수는 0으로 보고 argmax (같은 점수면 낮은 번호).
+// 순서는 GPU 원자 연산 순서라 섞이므로 파이썬에서 앵커 번호로 다시 정렬한다(기존 numpy 결과와 같은 순서 → 같은 NMS 결과).
 template <typename T>
-__global__ void k_select(const T* __restrict__ pred, int N, int nc, int nm, int cls, float conf,
+__global__ void k_select(const T* __restrict__ pred, int N, int nc, int nm, unsigned int cls_mask, float conf,
                          int* count, float* cand) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= N) return;
-    float sc = (float)pred[(size_t)(4 + cls) * N + i];
+    float sc = 0.f;
+    int best = 0;
+    for (int c = 0; c < nc && c < 32; c++) {
+        if (!((cls_mask >> c) & 1u)) continue;
+        float v = (float)pred[(size_t)(4 + c) * N + i];
+        if (v > sc) { sc = v; best = c; }
+    }
     if (!(sc > conf)) return;
     int k = atomicAdd(count, 1);
     if (k >= MAX_CAND) return;
-    int stride = 6 + nm;       // [anchor, cx, cy, w, h, score, coef...]
+    int stride = 7 + nm;       // [anchor, cx, cy, w, h, score, cls, coef...]
     float* o = cand + (size_t)k * stride;
     o[0] = (float)i;
     for (int r = 0; r < 4; r++) o[1 + r] = (float)pred[(size_t)r * N + i];
     o[5] = sc;
-    for (int m = 0; m < nm; m++) o[6 + m] = (float)pred[(size_t)(4 + nc + m) * N + i];
+    o[6] = (float)best;
+    for (int m = 0; m < nm; m++) o[7 + m] = (float)pred[(size_t)(4 + nc + m) * N + i];
 }
 
-extern "C" int og_select(void* p, const void* d_pred, int cls, float conf, cudaStream_t st, float** out) {
-    // 반환: 후보 수 (음수 = 오류). out 에 [anchor, cx, cy, w, h, score, coef x nm] x n 호스트 배열.
+extern "C" int og_select(void* p, const void* d_pred, unsigned int cls_mask, float conf, cudaStream_t st, float** out) {
+    // 반환: 후보 수 (음수 = 오류). out 에 [anchor, cx, cy, w, h, score, cls, coef x nm] x n 호스트 배열.
     OgCtx* c = (OgCtx*)p;
-    int N = c->n_anchor, stride = 6 + c->nm;
+    int N = c->n_anchor, stride = 7 + c->nm;
     int e = ck(cudaMemsetAsync(c->d_count, 0, sizeof(int), st));
     if (e) return -e;
-    if (c->fp16) k_select<__half><<<(N + 255) / 256, 256, 0, st>>>((const __half*)d_pred, N, c->nc, c->nm, cls, conf, c->d_count, c->d_cand);
-    else k_select<float><<<(N + 255) / 256, 256, 0, st>>>((const float*)d_pred, N, c->nc, c->nm, cls, conf, c->d_count, c->d_cand);
+    if (c->fp16) k_select<__half><<<(N + 255) / 256, 256, 0, st>>>((const __half*)d_pred, N, c->nc, c->nm, cls_mask, conf, c->d_count, c->d_cand);
+    else k_select<float><<<(N + 255) / 256, 256, 0, st>>>((const float*)d_pred, N, c->nc, c->nm, cls_mask, conf, c->d_count, c->d_cand);
     if ((e = ck(cudaGetLastError()))) return -e;
     if ((e = ck(cudaMemcpyAsync(c->h_count, c->d_count, sizeof(int), cudaMemcpyDeviceToHost, st)))) return -e;
     if ((e = ck(cudaStreamSynchronize(st)))) return -e;

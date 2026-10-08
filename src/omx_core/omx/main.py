@@ -65,8 +65,10 @@ def build(C, sim=False):
     from .perception.gpu_post import blocking_sync
     log.info("CUDA 대기 방식: %s", "잠든 채 대기" if blocking_sync() else "기본(라이브러리 없음)")
     cam = make_camera(C).start()
+    # 통합 모델 하나를 두 실행 통로로: 0 = 사람(D435i), 1 = 헬멧(입구 카메라). 가중치·CUDA 는 한 번만 올라간다.
     det = Detector(C.data_dir, C["perception"]["model"], C["perception"]["conf"], C["perception"]["imgsz"],
-                   C["perception"].get("backend", "direct"))
+                   C["perception"].get("backend", "direct"), lanes=2,
+                   require_any=C["perception"].get("person_classes", ["person"]))
     rec = Recorder(cam, C, clip_dir).start()
     hub = EventHub(C, db, rec)
     ex = Executor(bus, r, C.limits)
@@ -89,8 +91,7 @@ def build(C, sim=False):
         try:
             hc = C["helmet"]
             mono = UsbCamSource(hc["camera"], fps=hc["fps"]).start()
-            hdet = Detector(C.data_dir, hc["model"], hc["conf"], 640, C["perception"].get("backend", "direct"))
-            gate = HelmetGate(mono, hdet, C).start()
+            gate = HelmetGate(mono, det, C, lane=1).start()
         except Exception:
             log.exception("헬멧 게이트 시작 실패 — 출입문은 화재·수동으로만 열림")
     from .devices.site import SiteController

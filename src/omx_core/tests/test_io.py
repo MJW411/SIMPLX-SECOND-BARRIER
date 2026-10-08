@@ -2,6 +2,7 @@
 
 설정은 사용자 설정(data/settings.json)과 무관하게 여기서 고정한다.
 """
+import copy
 import sys
 import time
 from pathlib import Path
@@ -196,9 +197,17 @@ check(vio.door_open() and ev.got and ev.got[-1][0] == "door_manual", "수동 열
 
 # ---- 헬멧 판정
 print("[헬멧]")
+
+
+def stub_det(names, model_name="m"):
+    inv = {v: k for k, v in names.items()}
+    return SimpleNamespace(names=names, model_name=model_name, infer_ms=0.0, lane_ms=[0.0, 0.0], ready=True,
+                           class_ids=lambda wanted: [inv[n] for n in wanted if n in inv])
+
+
 D = lambda cls, conf: SimpleNamespace(cls=cls, name={0: "helmet", 1: "head"}[cls], conf=conf, box=(0, 0, 10, 10))  # noqa: E731
 cam = SimpleNamespace(latest=lambda: None, error="", fps_meas=0.0)
-det = SimpleNamespace(names={0: "helmet", 1: "head"}, model_name="m", infer_ms=0.0)
+det = stub_det({0: "helmet", 1: "head"})
 g = HelmetGate(cam, det, CFG)
 t = 1000.0
 g.evaluate([D(0, 0.9)], t)
@@ -214,9 +223,35 @@ g3 = HelmetGate(cam, det, CFG)
 for i in range(5):
     g3.evaluate([D(0, 0.3)], t + i * 0.2)
 check(not g3.wants_open(t + 1), "확신도 50% 미만 헬멧은 무시")
-g4 = HelmetGate(SimpleNamespace(latest=lambda: None, error="", fps_meas=0.0),
-                SimpleNamespace(names={0: "head", 1: "helmet"}, model_name="v3", infer_ms=0.0), CFG)
-check(g4.helmet_cls == 1 and g4.head_cls == 0, "클래스 번호가 다른 모델도 이름으로 찾음")
+g4 = HelmetGate(SimpleNamespace(latest=lambda: None, error="", fps_meas=0.0), stub_det({0: "head", 1: "helmet"}, "v3"), CFG)
+check(g4.helmet_ids == {1} and g4.head_ids == {0}, "클래스 번호가 다른 모델도 이름으로 찾음")
+
+# ---- v2 통합 모델 (fall-down / helmet / human): 사람 머리 영역의 헬멧
+V2 = {0: "fall-down", 1: "helmet", 2: "human"}
+V = lambda cls, box, conf=0.9: SimpleNamespace(cls=cls, name=V2[cls], conf=conf, box=box)  # noqa: E731
+HUMAN, HEAD_HELMET, HAND_HELMET = (100, 100, 200, 400), (130, 85, 170, 125), (120, 330, 160, 370)
+
+
+def run_gate(dets, match="head", n=4):
+    cfg = copy.deepcopy(CFG)
+    cfg["helmet"]["match"] = match
+    gg = HelmetGate(cam, stub_det(V2, "v2"), cfg)
+    for i in range(n):
+        gg.evaluate(dets, t + i * 0.2)
+    return gg
+
+
+check(run_gate([V(2, HUMAN), V(1, HEAD_HELMET)]).wants_open(t + 0.7), "v2 head: 사람 머리에 헬멧 → 열림")
+gx = run_gate([V(2, HUMAN), V(1, HAND_HELMET)])
+check(not gx.wants_open(t + 0.7) and "미착용" in gx.state, "v2 head: 손에 든 헬멧(아래쪽) → 닫힘")
+check(not run_gate([V(1, HEAD_HELMET)]).wants_open(t + 0.7), "v2 head: 사람 없이 헬멧만 → 닫힘")
+check(not run_gate([V(2, HUMAN), V(2, (300, 100, 400, 400)), V(1, HEAD_HELMET)]).wants_open(t + 0.7),
+      "v2 head: 두 사람 중 한 명만 착용 → 닫힘")
+check(run_gate([V(0, (100, 300, 400, 360)), V(1, (360, 315, 390, 345))]).wants_open(t + 0.7),
+      "v2 head: 넘어진 사람은 박스 전체에서 헬멧을 찾음")
+check(run_gate([V(2, HUMAN), V(1, HAND_HELMET)], match="presence").wants_open(t + 0.7),
+      "v2 presence: 사람과 헬멧이 함께 보이면 열림")
+check(not run_gate([V(1, HEAD_HELMET)], match="presence").wants_open(t + 0.7), "v2 presence: 헬멧만 → 닫힘")
 
 print()
 print("실패 %d건" % len(fails) if fails else "모두 통과")
