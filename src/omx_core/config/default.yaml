@@ -97,9 +97,12 @@ helmet:
   camera: auto             # auto: /dev/v4l/by-id 에서 RealSense 가 아닌 첫 카메라
   fps: 5                   # 추론 프레임 (카메라는 30fps 로 받고 이만큼만 압축을 푼다)
   # 모델: 사람 인식과 같은 통합 모델을 다른 실행 통로로 같이 쓴다 (perception.model)
-  match: head              # head: 사람 머리 영역에 헬멧이 겹쳐야 착용 | presence: 사람과 헬멧이 함께 보이면 착용
+  match: presence          # head: 사람 머리 영역에 헬멧이 겹쳐야 착용 | presence: 사람과 헬멧이 함께 보이면 착용
+                           # 2026-10-08 실기: 입구 카메라가 피규어를 가깝고 비스듬히 봐서 head 가 미착용으로 오판 → presence
   head_frac: 0.35          # head 방식: 사람 박스 위쪽 이 비율을 머리 영역으로 본다
   person_conf: 0.50        # 사람 검출 최소 확신도
+  always: true             # 항상 판정 (피규어 시연: 서 있는 동안 계속 판정, 헬멧이면 문 열림 유지). false = 움직일 때만
+  hold_sec: 3.0            # 움직임이 멈춘 뒤에도 이만큼 더 추론 (멈춰 선 사람도 연속 확인되게)
   conf: 0.50
   confirm_frames: 3        # 연속 N 프레임 착용이어야 문 열림 (5fps 에서 0.6초)
 
