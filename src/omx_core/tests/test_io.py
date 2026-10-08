@@ -98,7 +98,7 @@ time.sleep(0.1)
 check("포트 열기 실패" in io3.err, "포트가 없으면 다시 시도하며 이유를 남김")
 io3.stop()
 
-# ---- 컨베이어 제어 (도착 센서 D12 하나 = sensor2)
+# ---- 컨베이어 제어 (투입 센서 D11 = sensor1 이면 출발, 도착 센서 D12 = sensor2 면 정지)
 print("[컨베이어]")
 vio = VirtualIO()
 ev = Events()
@@ -110,7 +110,13 @@ cm.step(t)
 check(not vio.conveyor_on(), "작업 전에는 멈춤")
 runner.running = True
 cm.step(t + 0.1)
-check(vio.conveyor_on(), "작업 시작 + 센서 비어 있음 → 가동")
+check(not vio.conveyor_on(), "작업 중이라도 투입 센서에 물품이 없으면 멈춤 (빈 컨베이어 안 돌림)")
+vio.set_virtual(sensor1=True)
+cm.step(t + 0.1)
+check(vio.conveyor_on(), "투입 센서에 물품 → 출발")
+vio.set_virtual(sensor1=False)
+cm.step(t + 1.0)
+check(vio.conveyor_on(), "물품이 투입 센서를 지나가도 도착할 때까지 계속")
 vio.set_virtual(sensor2=True)
 cm.step(t + 3.1)
 check(not vio.s["conveyor"] and abs(cm.last_travel - 3.0) < 1e-6, "도착 센서 감지 → 정지, 도착 시간 기록")
@@ -118,14 +124,20 @@ cm.step(t + 10.0)
 check(not vio.s["conveyor"] and not ev.got, "물품이 있는 동안은 계속 멈춤 (로봇이 집는 중)")
 vio.set_virtual(sensor2=False)
 cm.step(t + 10.1)
-check(vio.conveyor_on(), "로봇이 집어 가 센서가 비면 다시 가동")
+check(not vio.conveyor_on(), "로봇이 집어 가도 새 물품이 올라오기 전에는 멈춤")
+vio.set_virtual(sensor1=True)
+cm.step(t + 10.2)
+check(vio.conveyor_on(), "새 물품이 투입 센서에 → 다시 가동")
+vio.set_virtual(sensor1=False)
 runner.running = False
 cm.step(t + 11.0)
 check(not vio.s["conveyor"], "작업이 끝나면 정지")
 check(not ev.got, "정상 흐름에는 이벤트 없음")
 
 runner.running = True
+vio.set_virtual(sensor1=True)
 cm.step(t + 20.0)
+vio.set_virtual(sensor1=False)
 cm.step(t + 34.9)
 check(vio.conveyor_on() and not safety.conveyor_alarm, "15초 전에는 이상 아님")
 cm.step(t + 35.1)
@@ -134,8 +146,9 @@ check(not vio.s["conveyor"] and safety.conveyor_alarm and ev.got and ev.got[-1][
 cm.step(t + 40.0)
 check(not vio.s["conveyor"], "이상 해제 전에는 다시 돌리지 않음")
 safety.conveyor_alarm = ""
+vio.set_virtual(sensor1=True)
 cm.step(t + 41.0)
-check(vio.conveyor_on(), "관리자 해제 뒤 (작업 중이면) 다시 가동")
+check(vio.conveyor_on(), "관리자 해제 뒤 (작업 중 + 물품) 다시 가동")
 safety.fire = True
 cm.step(t + 42.0)
 check(not vio.s["conveyor"], "화재 → 정지")
@@ -145,11 +158,19 @@ CFG["conveyor"]["travel_timeout"] = 0
 cm.step(t + 100.0)
 check(vio.conveyor_on() and not safety.conveyor_alarm, "제한시간 0 = 이상 판정 끔")
 CFG["conveyor"]["travel_timeout"] = 15.0
+vio.set_virtual(sensor1=False)
+runner.running = False
+cm.step(t + 101.0)                                  # 작업 끝 → 정지 (새 작업으로 시험)
+runner.running = True
+CFG["conveyor"]["start_sensor"] = False
+cm.step(t + 102.0)
+check(vio.conveyor_on(), "start_sensor=false: 예전 방식 (작업 중 도착 센서가 비면 가동)")
+CFG["conveyor"]["start_sensor"] = True
 vio.set_virtual(conveyor=True, sensor2=True)
 check(not vio.conveyor_on(), "가상 장치도 아두이노처럼 센서 감지 중엔 명령과 무관하게 멈춤")
 vio.set_virtual(sensor2=False)
 
-io5 = SimpleNamespace(rdy=False, cmds=[], ready=lambda: io5.rdy, sensor2=lambda: False, fire=lambda: False,
+io5 = SimpleNamespace(rdy=False, cmds=[], ready=lambda: io5.rdy, sensor1=lambda: True, sensor2=lambda: False, fire=lambda: False,
                       set_conveyor=lambda on: io5.cmds.append(on))
 cm5 = ConveyorMonitor(io5, Events(), CFG, SimpleNamespace(conveyor_alarm="", fire=False),
                       SimpleNamespace(running=True), start=False)
@@ -157,7 +178,7 @@ cm5.step(0.0)
 check(io5.cmds == [], "아두이노 첫 응답 전에는 아무 명령도 안 함")
 io5.rdy = True
 cm5.step(0.1)
-check(io5.cmds == [True], "첫 응답 뒤 작업 중이면 가동")
+check(io5.cmds == [True], "첫 응답 뒤 작업 중 + 물품이면 가동")
 
 # ---- 불빛
 print("[불빛]")

@@ -209,11 +209,12 @@ def pickplace_template(poses):
 
 
 class ConveyorMonitor:
-    """컨베이어 제어와 감시 (2026-10-07 수정: 센서는 D12 하나 = 도착 센서, 이 코드의 sensor2).
+    """컨베이어 제어와 감시 (2026-10-08: 센서 둘 — 투입 D11 = sensor1, 도착 D12 = sensor2).
 
-    - 작업(작업 순서)이 실행 중이고 도착 센서에 물품이 없으면 컨베이어를 돌린다.
-    - 도착 센서가 감지하거나 작업이 끝나면 멈춘다 (아두이노도 센서 감지 시 스스로 즉시 멈춘다).
-      로봇이 물품을 집어 가 센서가 비면 작업 중인 동안 다시 돈다.
+    - 작업(작업 순서)이 실행 중이고 투입 센서에 물품이 올라오면 출발한다 (빈 컨베이어는 돌리지 않는다).
+      출발한 뒤에는 물품이 투입 센서를 지나가도 도착할 때까지 계속 돈다.
+      conveyor.start_sensor: false 면 예전처럼 작업 중 도착 센서가 비어 있는 동안 계속 돌린다.
+    - 도착 센서가 감지하거나 작업이 끝나면 멈춘다 (아두이노도 도착 센서 감지 시 스스로 즉시 멈춘다).
     - 한 번 돌기 시작해 제한시간(travel_timeout, 0=끔) 안에 도착 센서가 감지하지 않으면 멈추고
       컨베이어 이상(물품 미도달): 이벤트·녹화·알림. 관리자가 해제할 때까지 다시 돌리지 않는다.
     - 화재면 멈춘다.
@@ -253,10 +254,13 @@ class ConveyorMonitor:
         arrived = self.io.sensor2()
         fire = self.io.fire() or self.safety.fire
         working = self.runner is not None and self.runner.running
-        want = working and not arrived and not fire and not self.safety.conveyor_alarm
+        ok = working and not arrived and not fire and not self.safety.conveyor_alarm
+        use_start = self.cfg["conveyor"].get("start_sensor", True)
+        loaded = self.io.sensor1() if use_start else True
+        want = ok if self.on else (ok and loaded)      # 출발은 투입 센서에 물품이 있을 때, 계속 도는 건 도착까지
         if want and not self.on:
             self.t_run = now
-            self._set(True, "작업 중, 도착 센서 비어 있음")
+            self._set(True, "작업 중, 투입 센서에 물품" if use_start else "작업 중, 도착 센서 비어 있음")
         elif not want and self.on:
             if arrived:
                 self.last_travel = now - self.t_run
