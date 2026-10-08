@@ -22,7 +22,7 @@ from omx.robot.task import CycleRunner, pickplace_template
 from omx.robot.teach import TeachStore, grip_target
 from omx_interfaces.msg import Permit, RobotState
 
-from .common import QOS_CMD, QOS_LATEST, ChangePublisher, OmxNode, loop_thread, now, spin
+from .common import QOS_CMD, QOS_LATEST, ChangePublisher, OmxNode, device_lock, loop_thread, now, spin
 from .proxies import IoProxy, SafetyProxy
 
 GRIP_MIN_SPAN = 0.15        # 열림·닫힘 끝이 이보다 가까우면 열기·닫기가 사실상 움직이지 않는다
@@ -37,6 +37,7 @@ class RobotNode(OmxNode):
         ids = [r["ids"][k] for k in JOINTS6]
         backend = "sim" if sim or r["backend"] == "sim" else "real"
         if backend == "real":
+            device_lock("robot")
             try:
                 bus = DxlBus(r["port"], r["baud"], ids, C.limits["gripper_current_ma"])
             except BusError as e:

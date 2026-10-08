@@ -33,7 +33,8 @@ from omx.recording.recorder import Recorder  # noqa: E402
 from omx.robot import kinematics as K  # noqa: E402
 from omx_interfaces.msg import ClipStatus, Event, HelmetState, People, Person  # noqa: E402
 
-from .common import QOS_DURABLE, QOS_LATEST, ChangePublisher, OmxNode, loop_thread, now, shm_path, spin  # noqa: E402
+from .common import (QOS_DURABLE, QOS_LATEST, ChangePublisher, OmxNode, device_lock, loop_thread, now,  # noqa: E402
+                     shm_path, spin)
 from .proxies import ExecutorProxy, SafetyProxy  # noqa: E402
 
 STREAM_FPS = 15.0
@@ -48,6 +49,8 @@ class PerceptionNode(OmxNode):
             C.cfg["camera"]["source"] = "video"
             C.cfg["camera"]["video_path"] = video
         self.t_start_wall = time.time()
+        devs = ([] if video else ["realsense"]) + (["monocam"] if C["helmet"]["enabled"] and not no_helmet else [])
+        device_lock(*devs)
         self.ex = ExecutorProxy(self, C["robot"], permit_pub=False)
         self.safety = SafetyProxy(self)
         self.cam = make_camera(C).start()

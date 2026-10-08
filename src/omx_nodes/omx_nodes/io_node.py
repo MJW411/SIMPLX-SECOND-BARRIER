@@ -18,7 +18,7 @@ from omx.devices.site import SiteController
 from omx.robot.task import ConveyorMonitor
 from omx_interfaces.msg import IoState, RobotState
 
-from .common import QOS_LATEST, ChangePublisher, OmxNode, now, spin
+from .common import QOS_LATEST, ChangePublisher, OmxNode, device_lock, now, spin
 from .proxies import HelmetProxy, RunnerProxy, SafetyProxy, _Sub
 
 SAFETY_TIMEOUT = 1.0
@@ -28,6 +28,8 @@ class IoNode(OmxNode):
     def __init__(self, virtual=False):
         super().__init__("io")
         C = self.cfg
+        if C["devices"]["backend"] == "arduino" and not virtual:
+            device_lock("arduino")
         self.io = io = make_io(C, force_virtual=virtual)
         self.safety = SafetyProxy(self)
         self.runner = RunnerProxy(_Sub(self, RobotState, "/omx/robot_state"))
