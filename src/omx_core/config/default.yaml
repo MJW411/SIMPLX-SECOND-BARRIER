@@ -1,0 +1,97 @@
+# 시스템 설정. 현장 튜닝 값은 여기(또는 data/settings.json 의 제어판 변경값)에만 둔다.
+
+robot:
+  backend: real            # real | sim  (sim: 로봇 없이 시험)
+  port: auto               # auto: /dev/serial/by-id 의 ROBOTIS 장치 (전원 재투입으로 ttyACM 번호가 바뀌어도 찾음)
+  baud: 1000000
+  ids: {joint1: 11, joint2: 12, joint3: 13, joint4: 14, joint5: 15, gripper: 16}
+  control_hz: 50
+  # 시간 기반 프로파일(Drive Mode 4)의 프로파일 시간(ms). 짧은 목표를 50Hz로 흘려보내므로
+  # 프로그램이 죽어도 로봇은 마지막 작은 목표에서 멈춘다.
+  profile_time_ms: 120
+  profile_acc_ms: 40
+  # 접힌 휴식 자세 (토크 끄기 전 이동). 공식 "home"은 j2=-1.57 이지만 실측 기구 멈춤점(-1.555)에 기대므로 -1.52.
+  rest_pose: [0.0, -1.52, 1.57, 1.57, 0.0]
+  bus_watchdog_ms: 0       # 0=끔. Dynamixel Bus Watchdog (20ms 단위로 반올림)
+  # 그리퍼(XL330) 위치 이득. 모터 값(P 250 I 0 D 600)으로는 기구 마찰 때문에 목표보다 약 0.1 rad 덜 갔다
+  # (2026-10-07 실측: 0.5→0.385, 0.9→0.79, 0→0.084, 전류는 한도의 30% 미만). 힘은 여전히 전류 한도(그리퍼 힘 %)로 묶인다.
+  gripper_gains: {p: 500, i: 50}
+
+camera:
+  source: realsense        # realsense | video
+  video_path: ""           # source=video 일 때 재생할 파일 (녹화 영상으로 시험)
+  width: 640
+  height: 480
+  fps: 30                  # 2026-09-27: 15 → 30 (최적화로 여유 생김 — 화면 매끄럽고 판단 주기 67 → 33 ms)
+
+perception:
+  model: yolo11n-seg.engine   # ~/models 또는 data/models 안의 파일 이름
+  # direct: .engine 을 torch·ultralytics 없이 TensorRT 로 직접 실행 (실측 프로세스 1416 → 461 MB, 같은 검출 결과)
+  # ultralytics: 기존 방식 (.pt/.onnx 는 항상 이쪽)
+  backend: direct
+  conf: 0.60               # 사람 인식 최소 확신도. 로봇이 person 0.60~0.63으로 잡혀 사용자 요청으로 0.30→0.60 (손 검출이 줄 수 있음)
+  imgsz: 640
+  person_class: 0
+  min_depth_pixels: 30
+  depth_range: [0.12, 4.0]
+  max_points: 400          # 사람 한 명당 거리 계산에 쓰는 3D 점 수 (다운샘플)
+  stale_timeout: 1.0       # 인식 결과가 이 시간 이상 갱신 안 되면 고장(정지)
+  min_brightness: 30       # 영상 평균 밝기가 이보다 1.5초 이상 낮으면 인식 불가 → 고장 정지 (불 꺼진 방)
+  # 로봇 자기 오검출 필터: 사람 마스크의 max_frac 이상이 로봇 색(주황)이면 사람이 아니라 로봇으로 본다.
+  # (실기 시험에서 움직이는 OMX 팔이 person 으로 간헐 검출돼 사라짐 정지가 걸린 문제 대응)
+  robot_filter: {enabled: true, hsv_lo: [2, 190, 70], hsv_hi: [13, 255, 255], max_frac: 0.25}
+
+safety:
+  profile: figure          # figure(피규어 시연) | human(실제 사람)
+  profiles:
+    figure: {slow: 0.25, stop: 0.12, clear: 0.30}
+    human:  {slow: 1.20, stop: 0.60, clear: 1.40}
+  slow_scale: 0.35         # 감속 시 속도 배율
+  confirm_frames: 3        # 연속 N 프레임 같은 판정이어야 감속/정지 진입 (30fps 에서 0.1초; 15fps 때 2프레임 = 0.13초)
+  # 감시 구역 (로봇 베이스 기준, m). 보정 전에는 카메라 기준.
+  zone_base: {x: [-0.6, 0.9], y: [-0.8, 0.8], z: [-0.2, 1.2]}
+  # 사라짐 판정
+  vanish_grace: 1.0        # 이 시간 안에 같은 위치에서 다시 보이면 사라짐 아님 (s)
+  vanish_min_frames: 6     # 연속 N 프레임 이상 보인 사람만 사라짐 대상 (깜박이는 오검출 제외, 30fps 에서 0.2초)
+  vanish_match_radius: 0.15  # 직전-현재 검출 1:1 매칭 반경 (m)
+  exit_border_px: 40       # 화면 가장자리 이 폭 안에서 사라지면 출구로 본다
+  door_roi_px: null        # [x1,y1,x2,y2] 출입문 영역 (이미지 좌표)
+
+recording:
+  segment_sec: 2
+  keep_sec: 60
+  fps: 15                  # 사고 영상 프레임 (10 → 15, 최적화로 여유)
+  jpeg_quality: 70
+  segment_dir: /dev/shm/omx_segments
+  pre_sec: 8               # n
+  post_sec: 16             # m (사람·사라짐)
+  conveyor_post_sec: 16    # L (컨베이어)
+  limits: {pre_max: 50, post_max: 120}
+
+storage:
+  data_dir: data
+  budget_ratio: 0.50       # SSD 전체 용량 대비 데이터 예산
+
+conveyor:
+  travel_timeout: 15.0     # 컨베이어가 돌기 시작한 뒤 도착 센서(D12)까지 제한시간 (s, 0=끔). 넘으면 정지 + 이상 이벤트·녹화·알림
+
+devices:
+  backend: arduino         # virtual | arduino  (--sim + 영상 파일 시험은 항상 virtual)
+  arduino_port: auto       # auto: /dev/serial/by-id 의 FT232R·CH340 (로봇 장치 제외), 없으면 첫 /dev/ttyUSB*
+  arduino_baud: 9600       # 스케치(arduino/omx_io)와 같아야 함. 네오픽셀 때문에 9600
+
+door:
+  close_sec: 5.0           # 헬멧 확인(또는 수동 열기) 뒤 이 시간이 지나면 닫힘. 화재 중에는 계속 열림
+
+helmet:
+  enabled: true
+  camera: auto             # auto: /dev/v4l/by-id 에서 RealSense 가 아닌 첫 카메라
+  fps: 5                   # 추론 프레임 (카메라는 30fps 로 받고 이만큼만 압축을 푼다)
+  model: helmet_best_fixed.engine   # 0=helmet 1=head. helmet_best.* 는 이름이 뒤바뀐 원본이라 쓰지 않음
+  conf: 0.50
+  confirm_frames: 3        # 연속 N 프레임 헬멧(머리 미착용 없음)이어야 문 열림 (5fps 에서 0.6초)
+
+web:
+  host: 0.0.0.0
+  port: 8000
+  users: {admin: omx1234}  # 첫 로그인 후 바꿀 것
