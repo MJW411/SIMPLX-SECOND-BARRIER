@@ -183,11 +183,14 @@ check(io5.cmds == [True], "첫 응답 뒤 작업 중 + 물품이면 가동")
 # ---- 불빛
 print("[불빛]")
 check(lamp_code(True, "STOP", True, True) == "Y", "화재 노랑이 가장 우선")
-check(lamp_code(False, "SLOW", False, True) == "O", "사람 감속 거리 → 주황 점멸")
-check(lamp_code(False, "STOP", False, False) == "O", "사람 정지 거리 → 주황 점멸")
-check(lamp_code(False, "CLEAR", True, True) == "O", "사라진 뒤 다시 안 나타남 → 주황 점멸")
+check(lamp_code(False, "SLOW", False, True) == "O", "사람 감속 거리 → 주황")
+check(lamp_code(False, "STOP", False, False) == "R", "사람 정지 거리 → 빨강")
+check(lamp_code(False, "CLEAR", False, False, human_alarm=True) == "R", "사람이 떠나도 재가동 전까지 빨강")
+check(lamp_code(False, "CLEAR", True, True) == "R", "사라진 뒤 확인 전 → 빨강")
 check(lamp_code(False, "CLEAR", False, True) == "B", "작업 중 → 하늘색")
-check(lamp_code(False, "CLEAR", False, False) == "G", "작업 끝·대기 → 녹색")
+check(lamp_code(False, "CLEAR", False, False) == "G", "대기 → 백색(G)")
+check(lamp_code(False, "CLEAR", False, False, done=True) == "C", "정한 횟수 완료 → 초록(C)")
+check(lamp_code(False, "SLOW", False, False, done=True) == "O", "완료 중이라도 사람 감속이 먼저")
 
 # ---- 출입문
 print("[출입문]")

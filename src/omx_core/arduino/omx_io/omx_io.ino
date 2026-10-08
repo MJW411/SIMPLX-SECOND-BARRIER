@@ -3,7 +3,8 @@
 // 배선 (2026-10-08 v4, 사용자 시험 스케치 기준):
 //   투입 센서 D11 · 도착 센서 D12 (IR 모듈 SZH-SSBH-002, 감지 시 LOW, 내부 풀업 — 빠진 핀이 '감지'로 읽히지 않게)
 //   화염 센서 A0 (불꽃이면 값 증가), 출입문 서보 D6 (93° 닫힘 / 10° 열림), 컨베이어 L298N IN1 D9 · IN2 D10
-//   조명 네오픽셀 16개 D13 (항상 백색), 대피 유도 네오픽셀 60개 D3
+//   벽면 네오픽셀 16개 D13: 평상시 백색, 사람 감속 주황(O), 사람 정지 빨강(R), 작업 완료 초록(C) — 화재·연결 끊김 때는 백색
+//   대피 유도 네오픽셀 60개 D3
 //   D3: 평상시 은은한 백색, 화재 시 노란 물결이 아두이노 쪽에서 먼 끝(입구) 쪽으로 흐르며 대피 방향을 알린다
 //       (불꽃 센서가 직접 감지했을 때 + 젯슨이 화재 상황(Y)을 알리는 동안 — 관리자 '상황 종료'까지)
 //   상태 줄: s1 = D11 투입, s2 = D12 도착
@@ -16,8 +17,8 @@
 //
 // 프로토콜 (9600bps, 줄 단위 텍스트):
 //   젯슨 → 아두이노: "C <conv> <door> <led>"  200ms마다 + 바뀔 때. 받는 것 자체가 하트비트.
-//                    conv/door = 0|1, led = G(녹색: 대기·작업 끝) B(하늘색: 작업 중) O(주황 점멸: 사람 접근)
-//                    Y(노랑: 화재 — 불꽃이 꺼진 뒤에도 관리자 '상황 종료'까지)
+//                    conv/door = 0|1, led = G(대기) B(작업 중) O(사람 감속) R(사람 정지, 재가동 전까지) C(작업 완료)
+//                    Y(화재 — 불꽃이 꺼진 뒤에도 관리자 '상황 종료'까지: 바닥 노란 물결)
 //   아두이노 → 젯슨: "S <s1> <s2> <fire> <door> <conv> <flame>"  바뀔 때 + 200ms마다
 //   그 밖의 줄(시작 안내 등)은 젯슨이 무시한다.
 // 9600bps인 이유: 네오픽셀 show() 동안 인터럽트가 꺼져(16개 약 0.5ms) 115200이면 받는 글자가 깨질 수 있다.
@@ -185,7 +186,7 @@ void handleLine(const char* s) {
   if (s[2] != '0' && s[2] != '1') return;
   if (s[4] != '0' && s[4] != '1') return;
   char led = s[6];
-  if (led != 'G' && led != 'B' && led != 'O' && led != 'Y') return;
+  if (led != 'G' && led != 'B' && led != 'O' && led != 'R' && led != 'C' && led != 'Y') return;
   convCmd = s[2] == '1';
   doorCmd = s[4] == '1';
   ledCmd = led;
@@ -257,7 +258,11 @@ void loop() {
   updateServo();
   // 대피 유도: 불꽃을 직접 봤을 때 + 젯슨이 화재 상황(Y)을 알리는 동안 (젯슨 연결이 끊겨도 불꽃이면 물결)
   updateGuide(fireOn || (linked && ledCmd == 'Y'), now);
-  // D13 조명은 항상 백색 (setup 에서 켬). 젯슨의 상태 색 지시(G/B/O)는 받기만 하고 쓰지 않는다.
+  // 벽면 D13: 사람 정지 빨강, 사람 감속 주황, 그 밖(대기·작업 중·화재·연결 끊김)은 백색. 같은 색이면 다시 그리지 않는다.
+  if (linked && ledCmd == 'R' && !fireOn) showColor(pixels.Color(255, 0, 0));
+  else if (linked && ledCmd == 'O' && !fireOn) showColor(pixels.Color(255, 90, 0));
+  else if (linked && ledCmd == 'C' && !fireOn) showColor(pixels.Color(0, 255, 0));
+  else showColor(pixels.Color(255, 255, 255));
 
   int st = a | b << 1 | fireOn << 2 | door << 3 | conv << 4;
   if (st != prevState || now - lastTx >= TX_INTERVAL) {

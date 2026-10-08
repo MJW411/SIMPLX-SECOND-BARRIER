@@ -84,11 +84,13 @@ class SafetyNode(OmxNode):
         sm = self.sm
         with sm.lock:
             v = (sm.state, sm.zone, sm.fire, sm.maintenance, sm.teach_mode, sm.stop_latched,
-                 float(sm.min_dist), len(sm.vanish.unresolved), len(sm.vanish.pending), sm.conveyor_alarm, sm.fallen)
+                 float(sm.min_dist), len(sm.vanish.unresolved), len(sm.vanish.pending), sm.conveyor_alarm, sm.fallen,
+                 sm.human_alarm)
         key = v[:6] + (round(v[6], 2) if v[6] != float("inf") else -1,) + v[7:]
         self.state_out.offer(key, lambda: SafetyState(
             t=now(), state=v[0], zone=v[1], fire=v[2], maintenance=v[3], teach_mode=v[4], stop_latched=v[5],
-            min_dist=v[6], vanish_unresolved=v[7], vanish_pending=v[8], conveyor_alarm=v[9], fallen=v[10]))
+            min_dist=v[6], vanish_unresolved=v[7], vanish_pending=v[8], conveyor_alarm=v[9], fallen=v[10],
+            human_alarm=v[11]))
 
 
 def main():

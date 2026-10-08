@@ -16,7 +16,7 @@ const EVENT_LABEL = {
   fire: "화재", fire_end: "화재 종료", fault: "고장", estop: "비상정지", restart: "재가동",
   vanish_clear: "사라짐 확인", maintenance: "정비 모드", system: "시스템", cycle: "반복 작업", cycle_fail: "반복 중단",
   pick_fail: "집기 실패", calib: "보정", settings: "설정 변경",
-  door_manual: "출입문 수동 열기", teach_mode: "티칭 모드", robot_temp: "모터 온도", robot_angle: "관절 각도 이상", cycle_start: "작업 시작", cycle_stop: "작업 정지", clip_save: "영상 저장", robot: "로봇", robot_fault: "로봇 고장",
+  cycle_done: "작업 완료", door_manual: "출입문 수동 열기", teach_mode: "티칭 모드", robot_temp: "모터 온도", robot_angle: "관절 각도 이상", cycle_start: "작업 시작", cycle_stop: "작업 정지", clip_save: "영상 저장", robot: "로봇", robot_fault: "로봇 고장",
 };
 const STEP_LABEL = { move: "관절 이동", linear: "직선 이동", home: "홈 이동", grip: "그리퍼", wait_sensor2: "센서 대기 (D12)", conveyor: "컨베이어", pause: "시간 대기" };
 const JOINTS = ["베이스", "어깨", "팔꿈치", "손목 기울기", "손목 회전", "그리퍼"];
@@ -119,6 +119,10 @@ function connectWS() {
   };
 }
 function onEvent(ev) {
+  if (ev.type === "cycle_done") {                // 정한 횟수를 마침 → 팝업 (확인을 누를 때까지)
+    $("#doneMsg").textContent = ev.message;
+    $("#doneModal").classList.remove("hidden");
+  }
   const lvl = ev.level === "alarm" ? "alarm" : ev.level === "warn" ? "warn" : "info";
   toast(`${EVENT_LABEL[ev.type] || ev.type}: ${ev.message}`, lvl, lvl === "alarm" ? 10000 : 5000);
   if (lvl === "alarm") {
@@ -244,8 +248,9 @@ function render() {
 
   // program
   const c = S.cycle;
-  tag("#cycleTag", c.running ? "실행 중" : "대기", c.running ? "ok" : "");
-  kv("#cycleKv", { "진행 상황": esc(c.status), "완료 횟수": `${c.cycles}회`, "경과 시간": c.running ? `${c.elapsed}초` : "—" });
+  tag("#cycleTag", c.running ? "실행 중" : c.done ? "작업 완료" : "대기", c.running || c.done ? "ok" : "");
+  kv("#cycleKv", { "진행 상황": esc(c.status), "완료 횟수": c.max_cycles ? `${c.cycles} / ${c.max_cycles}회` : `${c.cycles}회`,
+    "경과 시간": c.running ? `${c.elapsed}초` : "—" });
 
   // I/O
   const d = S.devices;
@@ -256,13 +261,13 @@ function render() {
     el.classList.toggle("on", v);
     el.querySelector("b").textContent = k === "door" ? (v ? "열림" : "닫힘") : k === "conveyor" ? (v ? "가동 중" : "멈춤") : (v ? "감지" : "없음");
   });
-  const LAMP = { G: "녹색 · 대기/작업 끝", B: "하늘색 · 작업 중", O: "주황 점멸 · 사람", Y: "노랑 · 화재" };
+  const LAMP = { G: "백색 · 대기", B: "백색 · 작업 중", C: "초록 · 작업 완료", O: "주황 · 사람 감속", R: "빨강 · 사람 정지(재가동 전까지)", Y: "노란 물결 · 화재 대피 유도" };
   const lc = S.site?.led || d.led || "G";
   $("#lampTile b").innerHTML = `<i class="lamp-dot lamp-${lc}"></i>${LAMP[lc] || lc}`;
   $("#devHint").textContent = d.backend === "virtual"
     ? "가상 장치입니다. 누를 때마다 켜짐/꺼짐이 바뀝니다. 작업 중에는 도착 센서가 꺼져 있으면 컨베이어가 돌고, 켜면 멈춥니다. 화재를 켜면 출입문이 열리고 로봇이 홈으로 돌아갑니다."
-    : "아두이노 실제 장치입니다. 센서 값은 실제 센서(D12)를 따릅니다. 작업 중에는 도착 센서가 비어 있으면 컨베이어가 돌고, 물품이 감지되거나 작업이 끝나면 멈춥니다. 출입문을 누르면 닫힘 시간 동안 열립니다.";
-  kv("#devKv", { "통신": esc(d.health), ...(d.flame != null ? { "화염 센서 값": `${d.flame} (100 넘으면 불꽃)` } : {}) });
+    : "아두이노 실제 장치입니다. 센서 값은 실제 센서(투입 D11·도착 D12)를 따릅니다. 작업 중 투입 센서에 물품이 올라오면 컨베이어가 돌고, 도착 센서가 감지하거나 작업이 끝나면 멈춥니다. 출입문을 누르면 닫힘 시간 동안 열립니다.";
+  kv("#devKv", { "통신": esc(d.health), ...(d.flame != null ? { "화염 센서 값": `${d.flame} (300 넘으면 불꽃 — 센서 보류 중이면 감지 꺼짐)` } : {}) });
   const st = S.site || {};
   const h = st.helmet;
   tag("#helmetTag", !h ? "꺼짐" : st.door_wanted ? "문 열림" : "닫힘", !h ? "" : st.door_wanted ? "ok" : "");
@@ -491,7 +496,13 @@ const goHome = () => api("/api/robot/home"), stopMotion = () => api("/api/robot/
 on("#btnHome", goHome); on("#ovHome", goHome); on("#btnStop", stopMotion); on("#ovStop", stopMotion);
 on("#btnReset", async () => { const r = await api("/api/robot/reset"); toast("해제: " + (r.result || "완료"), "ok", 8000); });
 $("#speed").addEventListener("change", (e) => api("/api/robot/speed", { ratio: e.target.value / 100 }).catch(() => {}));
-on("#btnCycleStart", async () => { await saveIfDirty(); await api("/api/cycle/start", {}); });
+try { const v = localStorage.getItem("omxCycleCount"); if (v !== null) $("#cycleCount").value = v; } catch (_) {}
+on("#btnCycleStart", async () => {
+  const n = Math.max(0, Math.floor(Number($("#cycleCount").value) || 0));
+  try { localStorage.setItem("omxCycleCount", String(n)); } catch (_) {}
+  await saveIfDirty(); await api("/api/cycle/start", { max_cycles: n });
+});
+on("#doneOk", () => $("#doneModal").classList.add("hidden"));
 on("#btnCycleOnce", async () => { await saveIfDirty(); await api("/api/cycle/start", { max_cycles: 1 }); });
 on("#btnCycleStop", () => api("/api/cycle/stop"));
 on("#btnSavePose", async () => {

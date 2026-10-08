@@ -27,6 +27,8 @@ class CycleRunner:
         self.cycles = 0
         self.grip_check = False          # 집기 실패 판정 (물체가 있을 때 켠다)
         self.t_start = 0.0
+        self.max_cycles = 0
+        self.done = False                # 정한 횟수를 다 마침 → 벽면 초록·완료 알림 (다음 시작·정지까지)
         # 정지 명령과 다음 동작 명령이 엇갈리지 않게: 동작을 보낼 때와 정지할 때 같은 잠금을 쓴다.
         # (예전: 정지 직후 단계 사이에 있던 실행 스레드가 다음 동작을 보내 로봇이 다시 움직일 수 있었다)
         self._cmd_lock = threading.Lock()
@@ -53,6 +55,8 @@ class CycleRunner:
         if not 0 <= start_at < len(seq):
             raise RuntimeError(f"없는 단계 {start_at + 1}")
         self.stop_evt.clear()
+        self.done = False
+        self.max_cycles = int(max_cycles)
         self.thread = threading.Thread(target=self._run, args=(seq, max_cycles, start_at), daemon=True, name="cycle")
         self.thread.start()
 
@@ -62,6 +66,7 @@ class CycleRunner:
         if not 0 <= index < len(seq):
             raise RuntimeError(f"없는 단계 {index + 1}")
         self.stop_evt.clear()
+        self.done = False
 
         def one():
             self.step_idx = index
@@ -79,6 +84,7 @@ class CycleRunner:
         self.thread.start()
 
     def stop(self, why="정지 명령"):
+        self.done = False
         if self.running:
             with self._cmd_lock:
                 self.stop_evt.set()
@@ -107,7 +113,7 @@ class CycleRunner:
     def _run(self, seq, max_cycles, start_at=0):
         self.t_start = time.monotonic()
         self.cycles = 0
-        limit = self.L["cycle_max_minutes"] * 60
+        limit = self.L.get("cycle_max_minutes", 0) * 60       # 0 = 시간 제한 없음
         log.info("반복 시작 (%d단계)", len(seq))
         try:
             while not self.stop_evt.is_set():
@@ -121,8 +127,10 @@ class CycleRunner:
                         raise InterruptedError()
                 self.cycles += 1
                 if max_cycles and self.cycles >= max_cycles:
+                    self.done = True
+                    self.events.emit("cycle_done", f"작업 완료 — {self.cycles}회 반복", level="info")
                     break
-                if time.monotonic() - self.t_start > limit:
+                if limit and time.monotonic() - self.t_start > limit:
                     self.events.emit("cycle_stop", f"작업 자동 정지: 반복 시간 한도 {self.L['cycle_max_minutes']}분 도달", level="info")
                     break
             self.status = f"완료 ({self.cycles}회)"
@@ -182,7 +190,7 @@ class CycleRunner:
 
     def snapshot(self):
         return {"running": self.running, "status": self.status, "step": self.step_idx, "cycles": self.cycles,
-                "grip_check": self.grip_check,
+                "max_cycles": self.max_cycles, "done": self.done, "grip_check": self.grip_check,
                 "elapsed": round(time.monotonic() - self.t_start) if self.running else 0}
 
 
