@@ -224,7 +224,9 @@ class ConveyorMonitor:
       conveyor.start_sensor: false 면 예전처럼 작업 중 도착 센서가 비어 있는 동안 계속 돌린다.
     - 도착 센서가 감지하거나 작업이 끝나면 멈춘다 (아두이노도 도착 센서 감지 시 스스로 즉시 멈춘다).
     - 한 번 돌기 시작해 제한시간(travel_timeout, 0=끔) 안에 도착 센서가 감지하지 않으면 멈추고
-      컨베이어 이상(물품 미도달): 이벤트·녹화·알림. 관리자가 해제할 때까지 다시 돌리지 않는다.
+      컨베이어 이상(물품 미도달): 이벤트·녹화·알림. 이상인 동안은 다시 돌리지 않는다.
+    - 자동 해제 (2026-10-08 사용자): 물품이 도착 센서에 닿거나(막힘이 풀림) 작업을 새로 시작하면 이상을 푼다.
+      관리자 '해제' 버튼도 그대로 쓸 수 있다.
     - 화재면 멈춘다.
     """
 
@@ -233,6 +235,11 @@ class ConveyorMonitor:
         self.on = False
         self.t_run = None
         self.last_travel = None
+        # 이 감시기가 건 이상 / 푼 시각 — 안전 노드 상태가 늦게 와도(노드 분리) 바로 반영되게
+        self._jam = False
+        self._jam_seen = False
+        self._clear_t = -1e9
+        self._was_working = False
         if start:
             threading.Thread(target=self._loop, daemon=True, name="conveyor").start()
 
@@ -262,7 +269,12 @@ class ConveyorMonitor:
         arrived = self.io.sensor2()
         fire = self.io.fire() or self.safety.fire
         working = self.runner is not None and self.runner.running
-        ok = working and not arrived and not fire and not self.safety.conveyor_alarm
+        alarm = self._alarm(now)
+        if alarm and (arrived or (working and not self._was_working)):
+            self._clear(now, "물품이 도착 센서에 닿음" if arrived else "작업을 새로 시작")
+            alarm = False
+        self._was_working = working
+        ok = working and not arrived and not fire and not alarm
         use_start = self.cfg["conveyor"].get("start_sensor", True)
         loaded = self.io.sensor1() if use_start else True
         want = ok if self.on else (ok and loaded)      # 출발은 투입 센서에 물품이 있을 때, 계속 도는 건 도착까지
@@ -282,8 +294,27 @@ class ConveyorMonitor:
             self._set(False, "제한시간 초과")
             self.t_run = None
             msg = f"컨베이어 이상 — {to:.0f}초 동안 돌았지만 도착 센서에 물품이 오지 않음, 컨베이어 정지"
+            self._jam, self._jam_seen = True, False
             self.safety.conveyor_alarm = msg
             self.events.emit("conveyor_jam", msg, level="alarm", clip=True)
+
+    def _alarm(self, now):
+        a = bool(self.safety.conveyor_alarm)
+        if now - self._clear_t < 1.0:                 # 방금 풀었다: 안전 노드 상태가 아직 옛 값일 수 있다
+            a = False
+        if self._jam:
+            if a:
+                self._jam_seen = True
+            elif self._jam_seen:                       # 관리자가 해제 버튼으로 풀었다
+                self._jam = False
+        return a or self._jam
+
+    def _clear(self, now, why):
+        self._jam = self._jam_seen = False
+        self._clear_t = now
+        self.safety.conveyor_alarm = ""
+        log.info("컨베이어 이상 자동 해제 — %s", why)
+        self.events.emit("conveyor_clear", f"컨베이어 이상 자동 해제 — {why}", level="info")
 
     def snapshot(self):
         return {"timing": self.on, "last_travel": self.last_travel,
