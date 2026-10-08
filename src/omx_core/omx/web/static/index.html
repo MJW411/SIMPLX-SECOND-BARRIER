@@ -42,7 +42,7 @@
 
 <div id="app" class="app hidden">
   <nav class="sidebar">
-    <div class="brand"><img src="/static/icon.svg" alt=""><div><b>OMX</b><span>세컨드 배리어</span></div></div>
+    <div class="brand"><img src="/static/icon.svg" alt=""><div><b>Second Barrier</b><span>Robot_safety</span></div></div>
     <a data-page="overview" class="active"><svg><use href="#i-overview"/></svg><span>모니터링</span></a>
     <a data-page="robot"><svg><use href="#i-robot"/></svg><span>로봇</span></a>
     <a data-page="teach"><svg><use href="#i-teach"/></svg><span>티칭</span></a>
@@ -271,6 +271,7 @@
           </div>
           <div class="card">
             <div class="card-h"><h3>실행</h3><span id="cycleTag" class="tag"></span></div>
+            <label class="field"><span>반복 횟수 (0 = 정지할 때까지)</span><input type="number" id="cycleCount" min="0" max="9999" step="1" value="3"></label>
             <div class="btn-row">
               <button class="btn ok big" id="btnCycleStart"><svg><use href="#i-play"/></svg>반복 시작</button>
               <button class="btn big" id="btnCycleOnce"><svg><use href="#i-play"/></svg>1회 실행</button>
@@ -486,6 +487,8 @@
   <div id="camHome" class="hidden">
     <div class="cam" id="cam"><img id="video" alt="카메라"><div id="camHint" class="cam-hint hidden"></div></div>
   </div>
+  <div id="doneModal" class="modal hidden"><div class="modal-card done-card"><div class="card-h"><h3>작업 완료</h3></div>
+    <p id="doneMsg" class="done-msg"></p><div class="btn-row"><button class="btn ok big" id="doneOk">확인</button></div></div></div>
   <div id="player" class="modal hidden"><div class="modal-card"><div class="card-h"><h3 id="playerTitle">클립</h3><button class="btn ghost" id="playerClose">닫기</button></div><video id="playerVideo" controls playsinline></video></div></div>
   <div id="alarmFx" class="alarm-fx hidden" aria-live="assertive"><div class="alarm-banner" id="alarmTxt"></div></div>
   <div id="toasts" class="toasts"></div>

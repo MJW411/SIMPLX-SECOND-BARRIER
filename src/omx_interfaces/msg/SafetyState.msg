@@ -11,3 +11,4 @@ uint16 vanish_unresolved
 uint16 vanish_pending
 string conveyor_alarm
 bool fallen
+bool human_alarm        # 사람이 정지 거리 안에 들어와 멈춤 → 재가동 전까지 유지 (벽면 빨강)

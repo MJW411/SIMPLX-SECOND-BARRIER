@@ -296,6 +296,10 @@ class SafetyProxy:
         return self._get("zone", "CLEAR")
 
     @property
+    def human_alarm(self):
+        return bool(self._get("human_alarm", False))
+
+    @property
     def vanish(self):
         return SimpleNamespace(unresolved=[None] * int(self._get("vanish_unresolved", 0)),
                                pending=[None] * int(self._get("vanish_pending", 0)))
@@ -319,6 +323,11 @@ class RunnerProxy:
     def running(self):
         m = self.sub.msg
         return bool(m.cycle_running) if m is not None and self.sub.fresh() else False
+
+    @property
+    def done(self):
+        m = self.sub.msg
+        return bool(m.cycle_done) if m is not None and self.sub.fresh() else False
 
 
 class HelmetProxy:

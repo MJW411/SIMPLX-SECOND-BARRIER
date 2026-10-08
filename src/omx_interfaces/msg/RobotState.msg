@@ -8,6 +8,7 @@ bool estop
 string fault
 string motion           # 진행 중 동작 이름 ("jog" = 조그)
 bool cycle_running      # 작업 순서 실행 중
+bool cycle_done         # 정한 반복 횟수를 다 마침 (다음 시작·정지까지)
 # 최근 동작 결과 (원격 동작 핸들이 기다릴 때 쓴다): 같은 순서의 id / 상태 / 이유
 uint32[] motion_ids
 string[] motion_status  # running / done / cancelled / failed

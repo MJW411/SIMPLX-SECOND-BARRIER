@@ -55,5 +55,5 @@ permit_timeout: 0.30
 stall_yield_rad: 0.05
 stall_yield_time: 0.8        # 안전 관리자의 "움직여도 됨" 허가가 이 시간 끊기면 정지
 
-# 반복 동작 시험 제한 (분). 이 시간이 지나면 반복을 자동 종료.
-cycle_max_minutes: 4
+# 반복 동작 시간 제한 (분, 0 = 끔). 무인 시험용 한도였다 — 시연은 반복 횟수로 끝낸다 (2026-10-08 사용자: 4분 한도 없앰)
+cycle_max_minutes: 0

@@ -98,10 +98,10 @@ class RobotNode(OmxNode):
         motion = ex.motion.name if ex.motion is not None else ("jog" if ex.jog else "")
         stat = [m.status for _, m in ms]
         key = (tuple(round(v, 4) for v in q), st is not None, ex.torque_on, ex.freedrive, ex.estop, ex.fault, motion,
-               self.runner.running, tuple(stat))
+               self.runner.running, self.runner.done, tuple(stat))
         self.state_out.offer(key, lambda: RobotState(
             t=now(), q=q, ok=st is not None, torque_on=ex.torque_on, freedrive=ex.freedrive, estop=ex.estop,
-            fault=ex.fault, motion=motion, cycle_running=self.runner.running,
+            fault=ex.fault, motion=motion, cycle_running=self.runner.running, cycle_done=self.runner.done,
             motion_ids=[i for i, _ in ms], motion_status=stat, motion_reason=[m.reason or "" for _, m in ms]))
 
     def snapshot(self):

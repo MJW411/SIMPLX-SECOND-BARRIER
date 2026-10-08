@@ -1,11 +1,12 @@
 """현장 출력 정리: 출입문과 상태 불빛을 한 곳에서 정해 장치(아두이노·가상)에 계속 보낸다.
 
 출입문: 화재(상황 종료 전까지) 또는 헬멧 확인 후 close_sec 동안, 또는 관리자가 제어판에서 연 뒤 close_sec 동안 열림.
-불빛 (우선순위 순):
-  Y 노랑        — 화재 (아두이노는 불꽃을 보면 젯슨을 기다리지 않고 스스로 노랑)
-  O 주황 점멸   — 사람이 로봇에 접근해 감지되는 동안(감속·정지 거리 안), 또는 사라진 뒤 다시 나타나지 않은 동안
-  B 하늘색      — 작업 중 (작업 순서 실행 중)
-  G 녹색        — 작업 끝·대기
+불빛 코드 (우선순위 순) — 아두이노 v4 표시: 벽면 D13 16개, 바닥 D3 60개 (2026-10-08)
+  Y 화재        — 바닥 노란 물결(입구 쪽), 벽면 백색
+  R 사람 정지   — 벽면 빨강: 사람이 정지 거리 안(재가동 전까지 유지), 또는 사라진 뒤 확인 전
+  O 사람 감속   — 벽면 주황: 사람이 감속 거리 안
+  B 작업 중 / G 대기 — 벽면 백색
+  C 작업 완료   — 벽면 초록: 정한 반복 횟수를 마침 (다음 작업 시작·정지까지)
 """
 import logging
 import threading
@@ -14,13 +15,17 @@ import time
 log = logging.getLogger("site")
 
 
-def lamp_code(fire, zone, vanish_unresolved, running):
+def lamp_code(fire, zone, vanish_unresolved, running, human_alarm=False, done=False):
     if fire:
         return "Y"
-    if zone in ("SLOW", "STOP") or vanish_unresolved:
+    if zone == "STOP" or human_alarm or vanish_unresolved:
+        return "R"
+    if zone == "SLOW":
         return "O"
     if running:
         return "B"
+    if done:
+        return "C"
     return "G"
 
 
@@ -47,7 +52,8 @@ class SiteController:
     def step(self, now):
         fire = self.safety.fire or self.io.fire()
         door = fire or now < self.manual_until or (self.gate is not None and self.gate.wants_open(now))
-        led = lamp_code(fire, self.safety.zone, bool(self.safety.vanish.unresolved), self.runner.running)
+        led = lamp_code(fire, self.safety.zone, bool(self.safety.vanish.unresolved), self.runner.running,
+                        bool(getattr(self.safety, "human_alarm", False)), bool(getattr(self.runner, "done", False)))
         if door != self.door:
             log.info("출입문 %s", "열림" if door else "닫힘")
         self.door, self.led = door, led

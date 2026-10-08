@@ -20,6 +20,8 @@ STORED = {
     # 사용자 판단: 재가동, 작업 시작·정지, 시스템 시작·종료, 영상 저장, 사라짐 확인, 설정·정비·보정 삭제, 출입문 수동 열기, 티칭 모드
     "restart", "cycle_start", "cycle_stop", "system", "clip_save", "vanish_clear", "settings", "maintenance", "calib",
     "door_manual", "teach_mode",
+    # 작업 완료 (정한 반복 횟수를 마침 — 제어판 팝업·벽면 초록)
+    "cycle_done",
 }
 
 
