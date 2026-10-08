@@ -225,6 +225,7 @@ class ConveyorMonitor:
     - 도착 센서가 감지하거나 작업이 끝나면 멈춘다 (아두이노도 도착 센서 감지 시 스스로 즉시 멈춘다).
     - 한 번 돌기 시작해 제한시간(travel_timeout, 0=끔) 안에 도착 센서가 감지하지 않으면 멈추고
       컨베이어 이상(물품 미도달): 이벤트·녹화·알림. 이상인 동안은 다시 돌리지 않는다.
+    - 이상이 나면 로봇 작업(작업 순서)도 멈춘다.
     - 자동 해제 (2026-10-08 사용자): 물품이 도착 센서에 닿거나(막힘이 풀림) 작업을 새로 시작하면 이상을 푼다.
       관리자 '해제' 버튼도 그대로 쓸 수 있다.
     - 화재면 멈춘다.
@@ -297,6 +298,9 @@ class ConveyorMonitor:
             self._jam, self._jam_seen = True, False
             self.safety.conveyor_alarm = msg
             self.events.emit("conveyor_jam", msg, level="alarm", clip=True)
+            # 컨베이어가 비정상으로 멈추면 로봇 작업도 멈춘다 (2026-10-08 사용자). 다시 시작하면 이상이 자동 해제된다.
+            if self.runner is not None and hasattr(self.runner, "stop"):
+                self.runner.stop("컨베이어 이상")
 
     def _alarm(self, now):
         a = bool(self.safety.conveyor_alarm)

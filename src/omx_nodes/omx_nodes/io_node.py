@@ -32,7 +32,7 @@ class IoNode(OmxNode):
             device_lock("arduino")
         self.io = io = make_io(C, force_virtual=virtual)
         self.safety = SafetyProxy(self)
-        self.runner = RunnerProxy(_Sub(self, RobotState, "/omx/robot_state"))
+        self.runner = RunnerProxy(_Sub(self, RobotState, "/omx/robot_state"), self.client("robot"))
         self.gate = HelmetProxy(self)
         self.site = SiteController(io, self.safety, self.runner, C, self.gate, self.events)
         self.conveyor = ConveyorMonitor(io, self.events, C, self.safety, self.runner, start=False)
