@@ -49,6 +49,8 @@ safety:
   profiles:
     figure: {slow: 0.25, stop: 0.12, clear: 0.30}
     human:  {slow: 1.20, stop: 0.60, clear: 1.40}
+  # 제어판에서 저장할 수 있는 최소 정지 거리 (m). 실제 사람 기준이 5cm 로 덮어써져 있던 문제(2026-10-08) 재발 방지
+  profile_min_stop: {figure: 0.03, human: 0.30}
   slow_scale: 0.35         # 감속 시 속도 배율
   confirm_frames: 3        # 연속 N 프레임 같은 판정이어야 감속/정지 진입 (30fps 에서 0.1초; 15fps 때 2프레임 = 0.13초)
   # 감시 구역 (로봇 베이스 기준, m). 보정 전에는 카메라 기준.
