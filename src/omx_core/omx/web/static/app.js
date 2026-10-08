@@ -16,7 +16,7 @@ const EVENT_LABEL = {
   fire: "화재", fire_end: "화재 종료", fault: "고장", estop: "비상정지", restart: "재가동",
   vanish_clear: "사라짐 확인", maintenance: "정비 모드", system: "시스템", cycle: "반복 작업", cycle_fail: "반복 중단",
   pick_fail: "집기 실패", calib: "보정", settings: "설정 변경",
-  cycle_done: "작업 완료", door_manual: "출입문 수동 열기", teach_mode: "티칭 모드", robot_temp: "모터 온도", robot_angle: "관절 각도 이상", cycle_start: "작업 시작", cycle_stop: "작업 정지", clip_save: "영상 저장", robot: "로봇", robot_fault: "로봇 고장",
+  cycle_done: "작업 완료", conveyor_clear: "컨베이어 이상 해제", door_manual: "출입문 수동 열기", teach_mode: "티칭 모드", robot_temp: "모터 온도", robot_angle: "관절 각도 이상", cycle_start: "작업 시작", cycle_stop: "작업 정지", clip_save: "영상 저장", robot: "로봇", robot_fault: "로봇 고장",
 };
 const STEP_LABEL = { move: "관절 이동", linear: "직선 이동", home: "홈 이동", grip: "그리퍼", wait_sensor2: "센서 대기 (D12)", conveyor: "컨베이어", pause: "시간 대기" };
 const JOINTS = ["베이스", "어깨", "팔꿈치", "손목 기울기", "손목 회전", "그리퍼"];

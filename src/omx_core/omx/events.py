@@ -22,6 +22,8 @@ STORED = {
     "door_manual", "teach_mode",
     # 작업 완료 (정한 반복 횟수를 마침 — 제어판 팝업·벽면 초록)
     "cycle_done",
+    # 컨베이어 이상 자동 해제 (물품 도착·작업 새로 시작)
+    "conveyor_clear",
 }
 
 
