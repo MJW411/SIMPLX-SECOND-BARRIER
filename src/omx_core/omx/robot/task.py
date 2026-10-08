@@ -27,6 +27,9 @@ class CycleRunner:
         self.cycles = 0
         self.grip_check = False          # 집기 실패 판정 (물체가 있을 때 켠다)
         self.t_start = 0.0
+        # 정지 명령과 다음 동작 명령이 엇갈리지 않게: 동작을 보낼 때와 정지할 때 같은 잠금을 쓴다.
+        # (예전: 정지 직후 단계 사이에 있던 실행 스레드가 다음 동작을 보내 로봇이 다시 움직일 수 있었다)
+        self._cmd_lock = threading.Lock()
 
     @property
     def running(self):
@@ -77,14 +80,24 @@ class CycleRunner:
 
     def stop(self, why="정지 명령"):
         if self.running:
-            self.stop_evt.set()
-            self.ex.stop_motion()
+            with self._cmd_lock:
+                self.stop_evt.set()
+                self.ex.stop_motion()
             self.status = f"정지: {why}"
+
+    def _cmd(self, fn, *a, **k):
+        """동작 명령을 보낸다. 이미 정지 명령이 왔으면 보내지 않는다."""
+        with self._cmd_lock:
+            if self.stop_evt.is_set():
+                raise InterruptedError()
+            return fn(*a, **k)
 
     def _wait(self, m):
         while True:
             st = m.wait(0.1)
             if st != "running":
+                if self.stop_evt.is_set():
+                    raise InterruptedError()
                 if st != "done":
                     raise RuntimeError(f"동작 {m.name} {'취소' if st == 'cancelled' else '실패'}: {m.reason}")
                 return
@@ -137,15 +150,15 @@ class CycleRunner:
             q[5] = ex.current_q()[5]
             if t == "linear":
                 x, y, z, p = K.fk(q)
-                self._wait(ex.move_linear(x, y, z, p, q5=q[4], name=f"linear {name}", speed_scale=speed))
+                self._wait(self._cmd(ex.move_linear, x, y, z, p, q5=q[4], name=f"linear {name}", speed_scale=speed))
             else:
-                self._wait(ex.move_joints(q, f"{t} {name}", speed_scale=speed))
+                self._wait(self._cmd(ex.move_joints, q, f"{t} {name}", speed_scale=speed))
         elif t == "grip":
             g = self.teach.snapshot()["gripper"]
             val = s.get("value", "open")
             target, force, what = self.teach.grip_action(s)
             ex.set_gripper_force(force)
-            self._wait(ex.move_gripper(target, f"grip {what}"))
+            self._wait(self._cmd(ex.move_gripper, target, f"grip {what}"))
             time.sleep(0.4)
             if val == "close" and not s.get("preset") and self.grip_check:
                 pos = ex.state.q[5]
@@ -159,7 +172,7 @@ class CycleRunner:
                     raise InterruptedError()
                 time.sleep(0.05)
         elif t == "conveyor":
-            self.io.set_conveyor(s.get("value", "on") == "on")
+            self._cmd(self.io.set_conveyor, s.get("value", "on") == "on")
         elif t == "pause":
             end = time.monotonic() + float(s.get("value", 1.0))
             while time.monotonic() < end:

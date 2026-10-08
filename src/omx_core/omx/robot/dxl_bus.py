@@ -77,6 +77,14 @@ class RobotState:
         self.hw_err = np.zeros(n, dtype=int)
         self.ok = False
 
+    def copy(self):
+        """다른 스레드가 읽는 동안 다음 읽기가 같은 배열을 고쳐 쓰지 않도록 복사본을 넘긴다."""
+        c = RobotState.__new__(RobotState)
+        c.t, c.ok = self.t, self.ok
+        for k in ("q", "dq", "load", "temp", "volt", "hw_err"):
+            setattr(c, k, getattr(self, k).copy())
+        return c
+
 
 class DxlBus:
     def __init__(self, port, baud, ids, gripper_current_ma=250):
@@ -236,7 +244,7 @@ class DxlBus:
 
     def read_state(self):
         with self.lock:
-            return self._read_state_locked()
+            return self._read_state_locked().copy()
 
     def _write_goal_locked(self, q):
         self.sw.clearParam()
@@ -316,7 +324,7 @@ class SimBus:
                 self.state.q = new
             self.state.t = now
             self.state.ok = True
-            return self.state
+            return self.state.copy()
 
     def write_goal(self, q):
         with self.lock:

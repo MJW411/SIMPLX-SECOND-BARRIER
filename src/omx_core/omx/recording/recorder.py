@@ -8,6 +8,7 @@
 - 화재처럼 끝이 정해지지 않은 녹화는 end()가 불릴 때까지 조각을 계속 모은다.
 - 알림은 클립 완성을 기다리지 않는다(이벤트 허브가 즉시 보낸다).
 """
+import hashlib
 import logging
 import os
 import shutil
@@ -37,7 +38,9 @@ class Recorder:
         self.seg_sec = rc["segment_sec"]
         self.keep = rc["keep_sec"]
         self.quality = rc["jpeg_quality"]
-        self.seg_dir = Path(rc["segment_dir"])
+        # 조각 폴더는 데이터 폴더마다 따로 (시험용 인스턴스가 실제 서버의 60초 버퍼를 지우지 않게)
+        tag = hashlib.md5(str(Path(clip_dir).resolve()).encode()).hexdigest()[:8]
+        self.seg_dir = Path(f"{rc['segment_dir']}_{tag}")
         shutil.rmtree(self.seg_dir, ignore_errors=True)
         self.seg_dir.mkdir(parents=True, exist_ok=True)
         self.clip_dir = Path(clip_dir)
@@ -52,6 +55,7 @@ class Recorder:
         self.lock = threading.Lock()
         self.jobs = {}              # key -> ClipJob
         self.enc_ms = 0.0
+        self.error = ""
         self._run = True
         self.thread = threading.Thread(target=self._loop, name="recorder", daemon=True)
 
@@ -67,7 +71,15 @@ class Recorder:
             f = self.cam.latest()
             now = time.monotonic()
             if f is not None and now - f.t < 1.0:
-                self._write(f, now)
+                try:
+                    self._write(f, now)
+                    self.error = ""
+                except Exception as e:            # 디스크 가득 등: 스레드가 죽지 않고 상태로 알린다
+                    if not self.error:
+                        log.exception("recorder write")
+                    self.error = str(e)
+                    self.cur, self.fh = None, None
+                    time.sleep(1.0)
             nxt += period
             d = nxt - time.monotonic()
             if d > 0:
@@ -129,7 +141,7 @@ class Recorder:
     def status(self):
         with self.lock:
             return {"segments": len(self.segments), "enc_ms": round(self.enc_ms, 1),
-                    "jobs": len(self.jobs), "fps": self.fps}
+                    "jobs": len(self.jobs), "fps": self.fps, "error": self.error}
 
 
 class ClipJob(threading.Thread):
@@ -162,28 +174,39 @@ class ClipJob(threading.Thread):
         time.sleep(0.1)
         with self.rec.lock:
             self.rec.jobs.pop(self.key, None)
-        path, size = self._encode()
+        try:
+            path, size = self._encode()
+        except Exception:                         # 실패해도 결과(실패)는 반드시 알린다 — DB 가 '녹화 중'에 머물지 않게
+            log.exception("clip encode")
+            path, size = None, 0
         shutil.rmtree(self.dir, ignore_errors=True)
         if self.on_done:
-            self.on_done(self.key, path, size)
+            try:
+                self.on_done(self.key, path, size)
+            except Exception:
+                log.exception("clip on_done")
 
     def _encode(self):
         parts = sorted(self.parts)
         if not parts:
             return None, 0
-        cat = self.dir / "all.mjpg"
-        with open(cat, "wb") as out:
-            for _, p, _ in parts:
-                with open(p, "rb") as f:
-                    shutil.copyfileobj(f, out)
         out_path = self.rec.clip_dir / f"{time.strftime('%Y%m%d_%H%M%S')}_{self.name_}_{self.key}.mp4"
         cmd = ["nice", "-n", "10", "ffmpeg", "-loglevel", "error", "-y", "-f", "mjpeg",
-               "-framerate", str(self.rec.fps), "-i", str(cat), "-c:v", "libx264", "-preset", "veryfast",
+               "-framerate", str(self.rec.fps), "-i", "pipe:0", "-c:v", "libx264", "-preset", "veryfast",
                "-crf", "28", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-threads", "2", str(out_path)]
         t0 = time.time()
-        r = subprocess.run(cmd, capture_output=True, text=True)
-        if r.returncode != 0:
-            log.warning("ffmpeg 실패: %s", r.stderr[-300:])
+        # 조각들을 한 파일로 다시 복사하지 않고 ffmpeg 입력으로 바로 흘려보낸다 (SSD 쓰기 한 번 줄임)
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        try:
+            for _, p, _ in parts:
+                with open(p, "rb") as f:
+                    shutil.copyfileobj(f, proc.stdin)
+            proc.stdin.close()
+        except BrokenPipeError:
+            pass
+        err = proc.stderr.read().decode(errors="replace")
+        if proc.wait() != 0 or not out_path.exists():
+            log.warning("ffmpeg 실패: %s", err[-300:])
             return None, 0
         log.info("clip %s %.1fs encode, %d parts", out_path.name, time.time() - t0, len(parts))
         return out_path, out_path.stat().st_size
