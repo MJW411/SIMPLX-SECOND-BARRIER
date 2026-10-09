@@ -5,7 +5,7 @@
 아두이노 쪽 책임 (젯슨 없이도 스스로):
 - 화재 감지 시 즉시 출입문 개방·컨베이어 정지·노란불
 - 젯슨 하트비트가 끊기면 컨베이어 정지·출입문 닫힘
-- 센서2 감지 시 컨베이어 즉시 정지
+- 센서2 감지 시 컨베이어 즉시 정지 (set_arrive_stop(False) 면 안 멈춤 — 도착 센서 고장 시 임시)
 """
 import logging
 import threading
@@ -22,6 +22,7 @@ class IOBase:
     def conveyor_on(self): ...
     def set_door(self, open_): ...
     def set_conveyor(self, on): ...
+    def set_arrive_stop(self, on): ...          # 도착 센서 감지 시 장치가 스스로 멈출지
     def set_led(self, code): ...                # G 녹색(대기·작업 끝) B 하늘색(작업 중) O 주황 점멸(사람) Y 노랑(화재)
     def led(self): return "G"
     def flame(self): return None
@@ -41,6 +42,7 @@ class VirtualIO(IOBase):
     def __init__(self):
         self.s = {"sensor1": False, "sensor2": False, "fire": False, "door": False, "conveyor": False}
         self.led_code = "G"
+        self.arrive_stop = True
         self.lock = threading.Lock()
 
     def set_virtual(self, **kw):
@@ -56,7 +58,10 @@ class VirtualIO(IOBase):
     def fire(self): return self.s["fire"]
     def door_open(self): return self.s["door"]
     def conveyor_on(self):                    # 아두이노처럼: 센서2·화재면 명령과 무관하게 멈춤
-        return self.s["conveyor"] and not self.s["sensor2"] and not self.s["fire"]
+        return self.s["conveyor"] and not (self.s["sensor2"] and self.arrive_stop) and not self.s["fire"]
+
+    def set_arrive_stop(self, on):
+        self.arrive_stop = bool(on)
 
     def set_door(self, open_):
         self.set_virtual(door=open_)
@@ -88,7 +93,7 @@ class ArduinoIO(IOBase):
         self.port_cfg, self.baud = port, baud
         self.opener = opener or self._open_serial
         self.st = {"sensor1": False, "sensor2": False, "fire": False, "door": False, "conveyor": False, "flame": 0}
-        self.cmd = {"conveyor": False, "door": False, "led": "G"}
+        self.cmd = {"conveyor": False, "door": False, "led": "G", "arrive_stop": True}
         self.port = ""
         self.err = "연결 전"
         self.last_rx = 0.0
@@ -121,7 +126,8 @@ class ArduinoIO(IOBase):
     # ---- 통신 스레드
     def _cmd_line(self):
         c = self.cmd
-        return f"C {int(c['conveyor'])} {int(c['door'])} {c['led']}\n".encode()
+        tail = "" if c["arrive_stop"] else " 0"         # 기본(도착 센서로 정지)이면 예전 형식 그대로
+        return f"C {int(c['conveyor'])} {int(c['door'])} {c['led']}{tail}\n".encode()
 
     def _parse(self, line):
         p = line.split()
@@ -192,6 +198,7 @@ class ArduinoIO(IOBase):
     def set_conveyor(self, on): self._set("conveyor", bool(on))
     def set_door(self, open_): self._set("door", bool(open_))
     def set_led(self, code): self._set("led", code)
+    def set_arrive_stop(self, on): self._set("arrive_stop", bool(on))
 
     def ready(self):
         return self.last_rx > 0.0

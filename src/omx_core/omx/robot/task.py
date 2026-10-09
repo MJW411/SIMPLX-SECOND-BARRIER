@@ -387,7 +387,10 @@ class ConveyorMonitor:
     def step(self, now):
         if not self.io.ready():
             return
-        arrived = self.io.sensor2()
+        use_arrive = self.cfg["conveyor"].get("arrive_sensor", True)
+        if hasattr(self.io, "set_arrive_stop"):
+            self.io.set_arrive_stop(use_arrive)
+        arrived = self.io.sensor2() if use_arrive else False     # 도착 센서 고장 시 임시: 작업 중이면 계속 돈다
         fire = self.io.fire() or self.safety.fire
         working = self.runner is not None and self.runner.running
         use_start = self.cfg["conveyor"].get("start_sensor", True)
