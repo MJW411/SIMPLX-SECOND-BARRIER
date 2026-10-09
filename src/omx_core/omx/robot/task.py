@@ -366,6 +366,7 @@ class ConveyorMonitor:
         self._was_working = False
         self._prev_loaded = False
         self._paused_by_jam = False
+        self._held = False          # 안전 정지로 도중에 멈춤 → 풀리면 투입 센서와 상관없이 이어서 돌림 (물품이 벨트 위에 있음)
         if start:
             threading.Thread(target=self._loop, daemon=True, name="conveyor").start()
 
@@ -411,10 +412,14 @@ class ConveyorMonitor:
             if hasattr(self.runner, "resume"):
                 self.runner.resume("컨베이어 이상 해제")
         self._was_working = working
-        ok = working and not arrived and not fire and not alarm
-        want = ok if self.on else (ok and loaded)      # 출발은 투입 센서에 물품이 있을 때, 계속 도는 건 도착까지
+        halted = getattr(self.safety, "state", "") == "STOP"     # 사람 정지·사라짐·고장·비상정지: 로봇과 같이 멈춤
+        if not working or arrived:
+            self._held = False
+        ok = working and not arrived and not fire and not alarm and not halted
+        want = ok if (self.on or self._held) else (ok and loaded)      # 출발은 투입 센서에 물품이 있을 때, 계속 도는 건 도착까지
         if want and not self.on:
-            self.t_run = now
+            self.t_run = now                       # 안전 정지 뒤 다시 돌 때도 제한시간을 새로 셈
+            self._held = False
             self._set(True, "작업 중, 투입 센서에 물품" if use_start else "작업 중, 도착 센서 비어 있음")
         elif not want and self.on:
             if arrived:
@@ -422,7 +427,8 @@ class ConveyorMonitor:
                 self.history.append({"t": round(time.time()), "s": round(self.last_travel, 2), "jam": False})
                 why = f"도착 센서 감지 ({self.last_travel:.1f}초)"
             else:
-                why = "화재" if fire else "작업 끝" if not working else "컨베이어 이상"
+                why = "화재" if fire else "작업 끝" if not working else "안전 정지" if halted else "컨베이어 이상"
+                self._held = halted and working and not fire and not alarm
             self._set(False, why)
             self.t_run = None
         to = self.cfg["conveyor"]["travel_timeout"]
