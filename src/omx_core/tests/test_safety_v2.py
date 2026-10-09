@@ -258,6 +258,79 @@ cr2.stop()
 check(not cr2.done, "정지를 누르면 완료 표시 해제")
 check(C.limits.get("cycle_max_minutes", 0) == 0, "시간 한도 없음 (0)")
 
+print("[일시 정지 → 재개: 멈춘 단계부터, 반복 횟수 이어서]")
+
+
+class PauseEx(FakeEx):
+    """동작은 release 될 때까지 진행 중, stop_motion 이면 취소."""
+
+    def __init__(self):
+        super().__init__()
+        self.cur = None
+
+    def stop_motion(self):
+        if self.cur is not None and self.cur.status == "running":
+            self.cur.status = "cancelled"
+
+    def move_joints(self, q, name, speed_scale=1.0):
+        sent.append(name)
+        m = SimpleNamespace(name=name, status="running", reason="")
+
+        def wait(t=None, m=m):
+            time.sleep(0.02)
+            if m.status == "running" and auto_done.is_set():
+                m.status = "done"
+            return m.status
+        m.wait = wait
+        self.cur = m
+        return m
+
+
+def until(cond, t=3.0):
+    end = time.monotonic() + t
+    while not cond() and time.monotonic() < end:
+        time.sleep(0.02)
+    return cond()
+
+
+sent.clear()
+auto_done = threading.Event()
+s2 = threading.Event()
+io_p = SimpleNamespace(sensor2=s2.is_set, set_conveyor=lambda on: None)
+teach_p = SimpleNamespace(snapshot=lambda: {"sequence": [{"type": "move", "pose": "a"}, {"type": "wait_sensor2"},
+                                                         {"type": "move", "pose": "b"}], "gripper": {}},
+                          pose_q=lambda n: [0.0] * 6, home_q=lambda: None)
+crp = CycleRunner(PauseEx(), teach_p, io_p, SimpleNamespace(emit=lambda *a, **k: None), C.limits)
+crp.start(max_cycles=2)
+until(lambda: sent == ["move a"])
+check(crp.pause("컨베이어 이상") and crp.paused, "동작 중 일시 정지")
+time.sleep(0.3)
+check(crp.running and sent == ["move a"] and crp.snapshot()["paused"], f"일시 정지 중: 작업은 살아 있고 새 동작 없음 ({sent})")
+check(crp.snapshot()["pause_why"] == "컨베이어 이상", "상태에 일시 정지 이유")
+auto_done.set()
+crp.resume("컨베이어 이상 해제")
+check(until(lambda: crp.step_idx == 1), "재개 → 취소됐던 1단계를 다시 하고 2단계(도착 센서 대기)로")
+check(sent == ["move a", "move a"], f"멈춘 단계(1단계)부터 다시 ({sent})")
+crp.pause("컨베이어 이상")                          # 도착 센서 대기 중 일시 정지
+time.sleep(0.2)
+s2.set()                                            # 일시 정지 중엔 센서가 와도 다음 단계로 가지 않음
+time.sleep(0.2)
+check(sent == ["move a", "move a"] and crp.step_idx == 1, "일시 정지 중엔 다음 단계로 안 넘어감")
+crp.resume()
+crp.thread.join(5.0)
+check(crp.cycles == 2 and crp.done, f"재개 뒤 반복 횟수 이어서 완료 ({crp.cycles}회, {crp.status})")
+check(sent == ["move a", "move a", "move b", "move a", "move b"], f"동작 순서 ({sent})")
+check(not crp.paused and not crp.pause("x"), "작업이 끝나면 일시 정지 안 됨")
+s2.clear()
+auto_done.clear()
+sent.clear()
+crp.start(max_cycles=1)
+until(lambda: sent == ["move a"])
+crp.pause("컨베이어 이상")
+crp.stop("정지 버튼")
+crp.thread.join(2.0)
+check(not crp.running and crp.status.startswith("정지") and not crp.resume(), "일시 정지 중 정지 버튼 → 작업 끝 (재개 안 됨)")
+
 ex.shutdown()
 print()
 print("실패 %d건" % len(fails) if fails else "모두 통과")

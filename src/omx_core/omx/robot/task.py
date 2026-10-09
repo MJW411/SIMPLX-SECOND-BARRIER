@@ -16,6 +16,10 @@ from . import kinematics as K
 log = logging.getLogger("task")
 
 
+class _Paused(Exception):
+    """작업 일시 정지 (컨베이어 이상 등) — 같은 단계를 재개 후 다시 한다."""
+
+
 class CycleRunner:
     def __init__(self, ex, teach, io, events, limits, safety=None):
         self.ex, self.teach, self.io, self.events, self.L = ex, teach, io, events, limits
@@ -29,6 +33,9 @@ class CycleRunner:
         self.t_start = 0.0
         self.max_cycles = 0
         self.done = False                # 정한 횟수를 다 마침 → 벽면 초록·완료 알림 (다음 시작·정지까지)
+        # 일시 정지: 작업을 끝내지 않고 하던 단계에서 기다린다. 재개하면 그 단계부터 다시, 반복 횟수도 이어서.
+        self.pause_evt = threading.Event()
+        self.pause_why = ""
         # 정지 명령과 다음 동작 명령이 엇갈리지 않게: 동작을 보낼 때와 정지할 때 같은 잠금을 쓴다.
         # (예전: 정지 직후 단계 사이에 있던 실행 스레드가 다음 동작을 보내 로봇이 다시 움직일 수 있었다)
         self._cmd_lock = threading.Lock()
@@ -55,6 +62,7 @@ class CycleRunner:
         if not 0 <= start_at < len(seq):
             raise RuntimeError(f"없는 단계 {start_at + 1}")
         self.stop_evt.clear()
+        self.pause_evt.clear()
         self.done = False
         self.max_cycles = int(max_cycles)
         self.thread = threading.Thread(target=self._run, args=(seq, max_cycles, start_at), daemon=True, name="cycle")
@@ -66,13 +74,14 @@ class CycleRunner:
         if not 0 <= index < len(seq):
             raise RuntimeError(f"없는 단계 {index + 1}")
         self.stop_evt.clear()
+        self.pause_evt.clear()
         self.done = False
 
         def one():
             self.step_idx = index
             self.status = f"{index + 1}단계만 실행: {seq[index]['type']}"
             try:
-                self._step(seq[index])
+                self._step_retry(seq[index], self.status)
                 self.status = f"{index + 1}단계 실행 완료"
             except InterruptedError:
                 self.status = "정지"
@@ -88,14 +97,58 @@ class CycleRunner:
         if self.running:
             with self._cmd_lock:
                 self.stop_evt.set()
+                self.pause_evt.clear()
                 self.ex.stop_motion()
             self.status = f"정지: {why}"
+
+    @property
+    def paused(self):
+        return self.running and self.pause_evt.is_set()
+
+    def pause(self, why="일시 정지"):
+        """하던 동작만 멈추고 작업은 끝내지 않는다. resume() 하면 멈춘 단계부터 다시."""
+        if not self.running or self.pause_evt.is_set():
+            return False
+        with self._cmd_lock:
+            self.pause_why = why
+            self.pause_evt.set()
+            self.ex.stop_motion()
+        self.status = f"일시 정지: {why}"
+        log.info("작업 일시 정지 — %s", why)
+        return True
+
+    def resume(self, why=""):
+        if not self.pause_evt.is_set():
+            return False
+        self.pause_evt.clear()
+        log.info("작업 재개%s", f" — {why}" if why else "")
+        return True
+
+    def _wait_resume(self):
+        while self.pause_evt.is_set():
+            if self.stop_evt.is_set():
+                raise InterruptedError()
+            time.sleep(0.05)
+        if self.stop_evt.is_set():
+            raise InterruptedError()
+
+    def _step_retry(self, s, status):
+        """단계를 실행한다. 일시 정지되면 재개될 때까지 기다렸다가 같은 단계를 처음부터 다시 한다."""
+        while True:
+            try:
+                self._step(s)
+                return
+            except _Paused:
+                self._wait_resume()
+                self.status = status
 
     def _cmd(self, fn, *a, **k):
         """동작 명령을 보낸다. 이미 정지 명령이 왔으면 보내지 않는다."""
         with self._cmd_lock:
             if self.stop_evt.is_set():
                 raise InterruptedError()
+            if self.pause_evt.is_set():
+                raise _Paused()
             return fn(*a, **k)
 
     def _wait(self, m):
@@ -104,6 +157,8 @@ class CycleRunner:
             if st != "running":
                 if self.stop_evt.is_set():
                     raise InterruptedError()
+                if self.pause_evt.is_set():          # 일시 정지로 취소된 동작 → 재개 후 다시
+                    raise _Paused()
                 if st != "done":
                     raise RuntimeError(f"동작 {m.name} {'취소' if st == 'cancelled' else '실패'}: {m.reason}")
                 return
@@ -122,7 +177,7 @@ class CycleRunner:
                         continue
                     self.step_idx = i
                     self.status = f"{self.cycles + 1}회차 {i + 1}/{len(seq)}단계: {s['type']} {s.get('pose', s.get('value', ''))}"
-                    self._step(s)
+                    self._step_retry(s, self.status)
                     if self.stop_evt.is_set():
                         raise InterruptedError()
                 self.cycles += 1
@@ -178,6 +233,8 @@ class CycleRunner:
             while not self.io.sensor2():
                 if self.stop_evt.is_set():
                     raise InterruptedError()
+                if self.pause_evt.is_set():
+                    raise _Paused()
                 time.sleep(0.05)
         elif t == "conveyor":
             self._cmd(self.io.set_conveyor, s.get("value", "on") == "on")
@@ -186,11 +243,14 @@ class CycleRunner:
             while time.monotonic() < end:
                 if self.stop_evt.is_set():
                     raise InterruptedError()
+                if self.pause_evt.is_set():
+                    raise _Paused()
                 time.sleep(0.05)
 
     def snapshot(self):
         return {"running": self.running, "status": self.status, "step": self.step_idx, "cycles": self.cycles,
                 "max_cycles": self.max_cycles, "done": self.done, "grip_check": self.grip_check,
+                "paused": self.paused, "pause_why": self.pause_why if self.paused else "",
                 "elapsed": round(time.monotonic() - self.t_start) if self.running else 0}
 
 
@@ -225,8 +285,10 @@ class ConveyorMonitor:
     - 도착 센서가 감지하거나 작업이 끝나면 멈춘다 (아두이노도 도착 센서 감지 시 스스로 즉시 멈춘다).
     - 한 번 돌기 시작해 제한시간(travel_timeout, 0=끔) 안에 도착 센서가 감지하지 않으면 멈추고
       컨베이어 이상(물품 미도달): 이벤트·녹화·알림. 이상인 동안은 다시 돌리지 않는다.
-    - 이상이 나면 로봇 작업(작업 순서)도 멈춘다.
-    - 자동 해제 (2026-10-08 사용자): 물품이 도착 센서에 닿거나(막힘이 풀림) 작업을 새로 시작하면 이상을 푼다.
+    - 이상이 나면 로봇 작업(작업 순서)을 일시 정지한다 (끝내지 않고 하던 단계에서 기다림).
+    - 자동 해제 + 자동 재개 (2026-10-09 사용자): 투입 센서에 물품이 새로 올라오거나(없다가 생김), 물품이 도착 센서에
+      닿거나, 작업을 새로 시작하거나, 관리자가 해제 버튼을 누르면 이상을 풀고 로봇 작업을 멈춘 단계부터 이어서 한다.
+      이상이 걸린 순간 투입 센서에 이미 물품이 있었다면 한 번 치웠다 다시 올려야 한다 (막힌 채 저절로 다시 돌지 않게).
       관리자 '해제' 버튼도 그대로 쓸 수 있다.
     - 화재면 멈춘다.
     """
@@ -241,6 +303,8 @@ class ConveyorMonitor:
         self._jam_seen = False
         self._clear_t = -1e9
         self._was_working = False
+        self._prev_loaded = False
+        self._paused_by_jam = False
         if start:
             threading.Thread(target=self._loop, daemon=True, name="conveyor").start()
 
@@ -270,14 +334,20 @@ class ConveyorMonitor:
         arrived = self.io.sensor2()
         fire = self.io.fire() or self.safety.fire
         working = self.runner is not None and self.runner.running
-        alarm = self._alarm(now)
-        if alarm and (arrived or (working and not self._was_working)):
-            self._clear(now, "물품이 도착 센서에 닿음" if arrived else "작업을 새로 시작")
-            alarm = False
-        self._was_working = working
-        ok = working and not arrived and not fire and not alarm
         use_start = self.cfg["conveyor"].get("start_sensor", True)
         loaded = self.io.sensor1() if use_start else True
+        new_item = use_start and loaded and not self._prev_loaded       # 투입 센서: 없다가 생긴 순간
+        self._prev_loaded = loaded if use_start else False
+        alarm = self._alarm(now)
+        if alarm and (arrived or new_item or (working and not self._was_working)):
+            self._clear(now, "물품이 도착 센서에 닿음" if arrived else "투입 센서에 새 물품" if new_item else "작업을 새로 시작")
+            alarm = False
+        if not alarm and self._paused_by_jam:          # 어떤 방법으로든 풀렸으면 로봇 작업 재개 (관리자 해제 포함)
+            self._paused_by_jam = False
+            if hasattr(self.runner, "resume"):
+                self.runner.resume("컨베이어 이상 해제")
+        self._was_working = working
+        ok = working and not arrived and not fire and not alarm
         want = ok if self.on else (ok and loaded)      # 출발은 투입 센서에 물품이 있을 때, 계속 도는 건 도착까지
         if want and not self.on:
             self.t_run = now
@@ -298,8 +368,11 @@ class ConveyorMonitor:
             self._jam, self._jam_seen = True, False
             self.safety.conveyor_alarm = msg
             self.events.emit("conveyor_jam", msg, level="alarm", clip=True)
-            # 컨베이어가 비정상으로 멈추면 로봇 작업도 멈춘다 (2026-10-08 사용자). 다시 시작하면 이상이 자동 해제된다.
-            if self.runner is not None and hasattr(self.runner, "stop"):
+            # 컨베이어가 비정상으로 멈추면 로봇 작업은 일시 정지 (2026-10-09 사용자: 해제되면 자동으로 이어서)
+            if self.runner is not None and hasattr(self.runner, "pause"):
+                self.runner.pause("컨베이어 이상")
+                self._paused_by_jam = True
+            elif self.runner is not None and hasattr(self.runner, "stop"):
                 self.runner.stop("컨베이어 이상")
 
     def _alarm(self, now):

@@ -248,7 +248,8 @@ function render() {
 
   // program
   const c = S.cycle;
-  tag("#cycleTag", c.running ? "실행 중" : c.done ? "작업 완료" : "대기", c.running || c.done ? "ok" : "");
+  tag("#cycleTag", c.paused ? "일시 정지" : c.running ? "실행 중" : c.done ? "작업 완료" : "대기",
+      c.paused ? "warn" : c.running || c.done ? "ok" : "");
   kv("#cycleKv", { "진행 상황": esc(c.status), "완료 횟수": c.max_cycles ? `${c.cycles} / ${c.max_cycles}회` : `${c.cycles}회`,
     "경과 시간": c.running ? `${c.elapsed}초` : "—" });
 
