@@ -975,7 +975,11 @@ function drawGauge(el, th, d, zone, preview = false) {
   const seg = (a, b, c, lbl, ink = "#fff") => `<rect x="${X(a)}" y="22" width="${Math.max(0, X(b) - X(a))}" height="14" fill="${c}"/>` +
     (X(b) - X(a) > 34 ? `<text x="${(X(a) + X(b)) / 2}" y="32.5" class="seg" fill="${ink}">${lbl}</text>` : "");
   const cid = `${el.id}Clip`;
-  const tick = (m, t) => `<line x1="${X(m)}" y1="20" x2="${X(m)}" y2="40" stroke="${VC.ink}" stroke-width="1"/><text x="${X(m)}" y="52" class="tick">${t}</text>`;
+  // 눈금 숫자가 붙어 있으면(감속~재가동 허용 사이가 좁을 때) 왼쪽은 오른쪽 끝, 오른쪽은 왼쪽 끝에 맞춰 벌린다
+  const tks = [0, th.stop, th.slow, th.clear].map((m) => ({ m, x: X(m), a: "" }));
+  for (let i = 1; i < tks.length; i++) if (tks[i].x - tks[i - 1].x < 52) { tks[i - 1].a ||= "end"; tks[i].a = "start"; }
+  const tick = ({ m, x, a }) => `<line x1="${x}" y1="20" x2="${x}" y2="40" stroke="${VC.ink}" stroke-width="1"/>` +
+    `<text x="${x + (a === "start" ? 2 : a === "end" ? -2 : 0)}" y="52" class="tick${a ? " " + a : ""}">${m}</text>`;
   let mk = "";
   if (d !== null && d !== undefined) {
     const x = X(d), col = d < th.stop ? VC.stop : d < th.slow ? VC.slow : d <= th.clear ? "#b45309" : VC.clear;
@@ -986,7 +990,7 @@ function drawGauge(el, th, d, zone, preview = false) {
     <defs><clipPath id="${cid}"><rect x="${x0}" y="22" width="${x1 - x0}" height="14" rx="7"/></clipPath></defs>
     <rect x="${x0}" y="22" width="${x1 - x0}" height="14" rx="7" fill="${VC.grid}"/>
     <g clip-path="url(#${cid})">${seg(0, th.stop, VC.stop, "정지")}${seg(th.stop, th.slow, VC.slow, "감속")}${seg(th.slow, th.clear, VC.hold, "대기", "#78350f")}${seg(th.clear, max, "#bbf7d0", "여유", "#166534")}</g>
-    ${tick(0, "0")}${tick(th.stop, th.stop)}${tick(th.slow, th.slow)}${tick(th.clear, th.clear)}<text x="${x1}" y="52" class="tick end">m</text>
+    ${tks.map(tick).join("")}<text x="${x1}" y="52" class="tick end">m</text>
     ${mk}${d === null || d === undefined ? `<text x="${W / 2}" y="4" class="val muted">${preview ? "미리 보기" : "사람 없음"}</text>` : ""}</svg>` +
     (bad ? `<div class="err small">정지 &lt; 감속 ≤ 재가동 허용 순서여야 합니다</div>` : "");
 }
