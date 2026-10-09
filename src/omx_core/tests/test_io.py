@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from omx.devices.io import ArduinoIO, VirtualIO  # noqa: E402
 from omx.devices.site import SiteController, lamp_code  # noqa: E402
@@ -23,7 +25,7 @@ def check(c, what):
         fails.append(what)
 
 
-CFG = {"conveyor": {"travel_timeout": 15.0}, "recording": {"pre_sec": 8},
+CFG = {"conveyor": {"travel_timeout": 15.0, "resume_pose": "place"}, "recording": {"pre_sec": 8},
        "door": {"close_sec": 5.0}, "helmet": {"conf": 0.5, "confirm_frames": 3}}
 
 
@@ -170,34 +172,58 @@ vio.set_virtual(conveyor=True, sensor2=True)
 check(not vio.conveyor_on(), "가상 장치도 아두이노처럼 센서 감지 중엔 명령과 무관하게 멈춤")
 vio.set_virtual(sensor2=False)
 
-# ---- 컨베이어 이상 자동 해제 (물품 도착 / 작업 새로 시작)
+# ---- 컨베이어 이상 자동 해제 + 로봇 작업 일시 정지·재개
 vj = VirtualIO()
 evj = Events()
 sj = SimpleNamespace(conveyor_alarm="", fire=False)
-rj = SimpleNamespace(running=True, stopped=[])
+rj = SimpleNamespace(running=True, stopped=[], log=[])
 rj.stop = lambda why: rj.stopped.append(why)
+rj.pause = lambda why, pose="": (rj.log.append(("pause", why)), setattr(rj, "pose", pose))
+rj.resume = lambda why: rj.log.append(("resume", why))
 cj = ConveyorMonitor(vj, evj, CFG, sj, rj, start=False)
 vj.set_virtual(sensor1=True)
 cj.step(200.0)
 vj.set_virtual(sensor1=False)
 cj.step(216.0)
 check(sj.conveyor_alarm and not vj.conveyor_on(), "15초 넘게 도착 안 함 → 이상")
-check(rj.stopped == ["컨베이어 이상"], "이상이면 로봇 작업도 정지 명령")
+check(rj.log == [("pause", "컨베이어 이상")] and rj.stopped == [], "이상이면 로봇 작업은 끝내지 않고 일시 정지")
+check(rj.pose == "place" and yaml.safe_load(open(Path(__file__).parent.parent / "config/default.yaml"))["conveyor"]["resume_pose"] == "place",
+      "재개할 때 place 자세에서 물품 대기 (기본 설정 resume_pose: place)")
 cj.step(217.0)
 check(sj.conveyor_alarm and not vj.conveyor_on(), "이상인 동안 다시 돌리지 않음")
-vj.set_virtual(sensor2=True)
+vj.set_virtual(sensor1=True)
 cj.step(218.0)
-check(not sj.conveyor_alarm and evj.got[-1][0] == "conveyor_clear", "물품이 도착 센서에 닿으면 자동 해제")
-vj.set_virtual(sensor2=False, sensor1=True)
-cj.step(219.5)
-vj.set_virtual(sensor1=False)
+check(not sj.conveyor_alarm and "투입 센서" in evj.got[-1][1], "투입 센서에 새 물품 → 자동 해제")
+check(rj.log[-1][0] == "resume", "해제되면 로봇 작업 재개")
+check(vj.conveyor_on(), "해제 즉시 컨베이어 다시 가동")
+cj.step(234.0)                                      # 그 물품도 15초 넘게 도착 안 함 (투입 센서엔 계속 있음)
+check(sj.conveyor_alarm and rj.log[-1] == ("pause", "컨베이어 이상"), "다시 막힘 → 이상·일시 정지")
+cj.step(235.0)
+check(sj.conveyor_alarm, "투입 센서에 물품이 계속 있기만 하면 저절로 풀지 않음 (새로 올라와야)")
+vj.set_virtual(sensor2=True)
 cj.step(236.0)
+check(not sj.conveyor_alarm and evj.got[-1][0] == "conveyor_clear" and rj.log[-1][0] == "resume",
+      "물품이 도착 센서에 닿아도 자동 해제·재개")
+vj.set_virtual(sensor2=False)
+cj.step(236.5)
+cj.step(252.0)
+check(sj.conveyor_alarm, "또 막힘 → 이상")
+cj.step(252.5)                                      # 안전 노드 상태에 이상이 실린 뒤
+n = len(rj.log)
+sj.conveyor_alarm = ""                              # 관리자 해제 버튼 (안전 노드가 이상 문구를 지움)
+cj.step(253.0)
+check(rj.log[n:] == [("resume", "컨베이어 이상 해제")], "관리자 해제 버튼으로 풀려도 재개")
+cj.step(254.0)
+check(rj.log[n + 1:] == [], "재개는 한 번만")
+vj.set_virtual(sensor1=False)
+cj.step(254.5)
+cj.step(270.0)
 check(sj.conveyor_alarm, "다시 막힘 → 이상")
 rj.running = False
-cj.step(237.0)
+cj.step(271.0)
 check(sj.conveyor_alarm, "작업이 끝나도 이상은 유지")
 rj.running = True
-cj.step(238.0)
+cj.step(272.0)
 check(not sj.conveyor_alarm and "새로 시작" in evj.got[-1][1], "작업을 새로 시작하면 자동 해제")
 
 io5 = SimpleNamespace(rdy=False, cmds=[], ready=lambda: io5.rdy, sensor1=lambda: True, sensor2=lambda: False, fire=lambda: False,

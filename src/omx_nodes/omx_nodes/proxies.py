@@ -324,6 +324,14 @@ class RunnerProxy:
         if self.rpc is not None:
             self.rpc.send("runner_stop", why=why)
 
+    def pause(self, why="일시 정지", pose=""):
+        if self.rpc is not None:
+            self.rpc.send("runner_pause", why=why, pose=pose)
+
+    def resume(self, why=""):
+        if self.rpc is not None:
+            self.rpc.send("runner_resume", why=why)
+
     @property
     def running(self):
         m = self.sub.msg

@@ -255,6 +255,8 @@ class RobotNode(OmxNode):
             "cycle_step": lambda a: runner.run_one(int(a["index"])),
             "cycle_stop": cycle_stop,
             "runner_stop": lambda a: runner.stop(a.get("why", "정지 명령")),
+            "runner_pause": lambda a: runner.pause(a.get("why", "일시 정지"), a.get("pose", "")),
+            "runner_resume": lambda a: runner.resume(a.get("why", "")),
             "grip_check": lambda a: setattr(runner, "grip_check", bool(a.get("on"))),
             "jog": lambda a: ex.jog_cmd(a["jog"], a.get("mode", "cart")),
             "move_joints": move_joints,
