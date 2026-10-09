@@ -36,6 +36,7 @@ class CycleRunner:
         # 일시 정지: 작업을 끝내지 않고 하던 단계에서 기다린다. 재개하면 그 단계부터 다시, 반복 횟수도 이어서.
         self.pause_evt = threading.Event()
         self.pause_why = ""
+        self.pause_pose = ""             # 일시 정지 동안 가서 기다릴 자세 이름 (빈 값 = 멈춘 자리에서)
         # 정지 명령과 다음 동작 명령이 엇갈리지 않게: 동작을 보낼 때와 정지할 때 같은 잠금을 쓴다.
         # (예전: 정지 직후 단계 사이에 있던 실행 스레드가 다음 동작을 보내 로봇이 다시 움직일 수 있었다)
         self._cmd_lock = threading.Lock()
@@ -105,12 +106,14 @@ class CycleRunner:
     def paused(self):
         return self.running and self.pause_evt.is_set()
 
-    def pause(self, why="일시 정지"):
-        """하던 동작만 멈추고 작업은 끝내지 않는다. resume() 하면 멈춘 단계부터 다시."""
+    def pause(self, why="일시 정지", pose=""):
+        """하던 동작만 멈추고 작업은 끝내지 않는다. pose 가 있으면 그 자세로 가서 기다린다.
+        resume() 하면 멈춘 단계부터 다시."""
         if not self.running or self.pause_evt.is_set():
             return False
         with self._cmd_lock:
             self.pause_why = why
+            self.pause_pose = pose or ""
             self.pause_evt.set()
             self.ex.stop_motion()
         self.status = f"일시 정지: {why}"
@@ -132,15 +135,52 @@ class CycleRunner:
         if self.stop_evt.is_set():
             raise InterruptedError()
 
+    def _park(self):
+        """일시 정지 동안 기다릴 자세로 간다 (그리퍼는 그대로 — 쥔 물체 유지). 돌아올 자리(멈춘 곳)를 돌려준다."""
+        name = self.pause_pose
+        if not name:
+            return None
+        try:
+            back = np.array(self.ex.current_q(), float)
+            q = np.array(self.teach.pose_q(name), float)
+            q[5] = back[5]
+            with self._cmd_lock:
+                if self.stop_evt.is_set():
+                    raise InterruptedError()
+                m = self.ex.move_joints(q, f"대기 {name}", speed_scale=0.5)
+            self.status = f"일시 정지: {self.pause_why} — {name} 자세로 이동"
+            while m.wait(0.1) == "running":
+                if self.stop_evt.is_set():
+                    raise InterruptedError()
+            if self.stop_evt.is_set():
+                raise InterruptedError()
+            self.status = f"일시 정지: {self.pause_why} — {name} 자세에서 대기" if m.status == "done" else \
+                f"일시 정지: {self.pause_why} — {name} 자세로 못 감 ({m.reason})"
+            return back
+        except InterruptedError:
+            raise
+        except Exception as e:                       # 자세가 없거나 로봇이 준비 안 됨 → 멈춘 자리에서 기다림
+            log.warning("일시 정지 대기 자세(%s)로 못 감: %s", name, e)
+            self.status = f"일시 정지: {self.pause_why} — 대기 자세로 못 감 ({e})"
+            return None
+
     def _step_retry(self, s, status):
-        """단계를 실행한다. 일시 정지되면 재개될 때까지 기다렸다가 같은 단계를 처음부터 다시 한다."""
+        """단계를 실행한다. 일시 정지되면 (대기 자세로 가서) 재개될 때까지 기다렸다가 같은 단계를 처음부터 다시 한다.
+        대기 자세로 갔었고 다시 할 단계가 관절 이동(move·home)이 아니면 (직선 이동·그리퍼·센서 대기 등)
+        먼저 멈췄던 자리로 돌아간다 — 예: 집으러 내려가던 중이면 그 높이로 돌아간 뒤 그리퍼를 닫는다."""
         while True:
             try:
                 self._step(s)
                 return
             except _Paused:
+                back = self._park()
                 self._wait_resume()
                 self.status = status
+                if back is not None and s["type"] not in ("move", "home"):
+                    try:
+                        self._wait(self._cmd(self.ex.move_joints, back, "멈춘 자리로 복귀", speed_scale=0.5))
+                    except _Paused:
+                        continue
 
     def _cmd(self, fn, *a, **k):
         """동작 명령을 보낸다. 이미 정지 명령이 왔으면 보내지 않는다."""
@@ -370,7 +410,7 @@ class ConveyorMonitor:
             self.events.emit("conveyor_jam", msg, level="alarm", clip=True)
             # 컨베이어가 비정상으로 멈추면 로봇 작업은 일시 정지 (2026-10-09 사용자: 해제되면 자동으로 이어서)
             if self.runner is not None and hasattr(self.runner, "pause"):
-                self.runner.pause("컨베이어 이상")
+                self.runner.pause("컨베이어 이상", self.cfg["conveyor"].get("pause_pose", ""))
                 self._paused_by_jam = True
             elif self.runner is not None and hasattr(self.runner, "stop"):
                 self.runner.stop("컨베이어 이상")

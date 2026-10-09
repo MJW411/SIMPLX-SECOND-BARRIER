@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from omx.devices.io import ArduinoIO, VirtualIO  # noqa: E402
 from omx.devices.site import SiteController, lamp_code  # noqa: E402
@@ -23,7 +25,7 @@ def check(c, what):
         fails.append(what)
 
 
-CFG = {"conveyor": {"travel_timeout": 15.0}, "recording": {"pre_sec": 8},
+CFG = {"conveyor": {"travel_timeout": 15.0, "pause_pose": "place"}, "recording": {"pre_sec": 8},
        "door": {"close_sec": 5.0}, "helmet": {"conf": 0.5, "confirm_frames": 3}}
 
 
@@ -176,7 +178,7 @@ evj = Events()
 sj = SimpleNamespace(conveyor_alarm="", fire=False)
 rj = SimpleNamespace(running=True, stopped=[], log=[])
 rj.stop = lambda why: rj.stopped.append(why)
-rj.pause = lambda why: rj.log.append(("pause", why))
+rj.pause = lambda why, pose="": (rj.log.append(("pause", why)), setattr(rj, "pose", pose))
 rj.resume = lambda why: rj.log.append(("resume", why))
 cj = ConveyorMonitor(vj, evj, CFG, sj, rj, start=False)
 vj.set_virtual(sensor1=True)
@@ -185,6 +187,8 @@ vj.set_virtual(sensor1=False)
 cj.step(216.0)
 check(sj.conveyor_alarm and not vj.conveyor_on(), "15초 넘게 도착 안 함 → 이상")
 check(rj.log == [("pause", "컨베이어 이상")] and rj.stopped == [], "이상이면 로봇 작업은 끝내지 않고 일시 정지")
+check(rj.pose == "place" and yaml.safe_load(open(Path(__file__).parent.parent / "config/default.yaml"))["conveyor"]["pause_pose"] == "place",
+      "일시 정지 동안 place 자세에서 대기 (기본 설정 pause_pose: place)")
 cj.step(217.0)
 check(sj.conveyor_alarm and not vj.conveyor_on(), "이상인 동안 다시 돌리지 않음")
 vj.set_virtual(sensor1=True)

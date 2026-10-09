@@ -331,6 +331,62 @@ crp.stop("정지 버튼")
 crp.thread.join(2.0)
 check(not crp.running and crp.status.startswith("정지") and not crp.resume(), "일시 정지 중 정지 버튼 → 작업 끝 (재개 안 됨)")
 
+print("[일시 정지 → place 자세에서 대기 → 재개]")
+
+
+class ParkEx(PauseEx):
+    def __init__(self):
+        super().__init__()
+        self.q = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.33])
+        self.targets = []
+
+    def current_q(self):
+        return self.q.copy()
+
+    def move_joints(self, q, name, speed_scale=1.0):
+        self.targets.append((name, np.array(q, float)))
+        return super().move_joints(q, name, speed_scale)
+
+
+poses = {"a": [1.0] * 6, "place": [2.0] * 6}
+sent.clear()
+auto_done.clear()
+s2.clear()
+exk = ParkEx()
+teach_k = SimpleNamespace(snapshot=lambda: {"sequence": [{"type": "move", "pose": "a"}, {"type": "wait_sensor2"}], "gripper": {}},
+                          pose_q=lambda n: poses[n], home_q=lambda: None)
+crk = CycleRunner(exk, teach_k, io_p, SimpleNamespace(emit=lambda *a, **k: None), C.limits)
+crk.start(max_cycles=1)
+until(lambda: sent == ["move a"])
+crk.pause("컨베이어 이상", "place")
+auto_done.set()
+check(until(lambda: "대기" in crk.status), f"일시 정지 → place 로 가서 대기 ({crk.status})")
+name, q = exk.targets[-1]
+check(name == "대기 place" and np.allclose(q[:5], 2.0) and abs(q[5] - 0.33) < 1e-9, "place 자세로, 그리퍼는 그대로 (쥔 물체 유지)")
+time.sleep(0.2)
+check(sent == ["move a", "대기 place"], f"대기 중 다른 동작 없음 ({sent})")
+crk.resume()
+check(until(lambda: crk.step_idx == 1), "재개 → 멈춘 단계(1단계 이동)부터 다시")
+check(sent == ["move a", "대기 place", "move a"], f"관절 이동 단계는 바로 목표로 ({sent})")
+crk.pause("컨베이어 이상", "place")                 # 도착 센서 대기 중 → place 로 갔다가 멈춘 자리로 돌아온 뒤 계속 대기
+check(until(lambda: "대기" in crk.status), "센서 대기 중 일시 정지 → place")
+crk.resume()
+check(until(lambda: "멈춘 자리로 복귀" in sent), f"관절 이동이 아닌 단계는 멈춘 자리로 먼저 복귀 ({sent})")
+check(np.allclose(exk.targets[-1][1], exk.q), "복귀 목표 = 멈췄던 자세")
+s2.set()
+crk.thread.join(5.0)
+check(crk.done, f"재개 뒤 작업 완료 ({crk.status})")
+teach_k.pose_q = lambda n: poses[n]
+sent.clear()
+s2.clear()
+crk.start(max_cycles=1)
+until(lambda: crk.step_idx == 1)
+crk.pause("컨베이어 이상", "없는자세")
+check(until(lambda: "못 감" in crk.status), f"자세가 없으면 멈춘 자리에서 대기 ({crk.status})")
+crk.stop("시험 끝")
+crk.thread.join(2.0)
+check(not crk.running, "정지")
+
 ex.shutdown()
 print()
 print("실패 %d건" % len(fails) if fails else "모두 통과")
