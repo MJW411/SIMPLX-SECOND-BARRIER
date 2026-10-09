@@ -48,7 +48,7 @@ safety:
   profile: figure          # figure(피규어 시연) | human(실제 사람)
   profiles:
     figure: {slow: 0.18, stop: 0.12, clear: 0.20}   # 13cm 피규어 = 실제 사람(약 166cm)의 1/12.8. ISO 13855 기준 정지 1.54 / 감속 2.30 / 해제 2.56m를 축소 (2026-10-09)
-    human:  {slow: 1.20, stop: 0.60, clear: 1.40}
+    human:  {slow: 2.30, stop: 1.54, clear: 2.56}   # ISO 13855: S = K·T + C = 1600mm/s × 0.43s + 850mm ≈ 1.54m, 감속 = 정지 + K·T, 해제 = 감속 + 0.26m (2026-10-09)
   # 제어판에서 저장할 수 있는 최소 정지 거리 (m). 실제 사람 기준이 5cm 로 덮어써져 있던 문제(2026-10-08) 재발 방지
   profile_min_stop: {figure: 0.03, human: 0.30}
   slow_scale: 0.35         # 감속 시 속도 배율
