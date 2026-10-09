@@ -332,6 +332,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .viz.gauge { margin: 14px 0 4px; }
 .viz .seg { font-size: 9px; font-weight: 700; text-anchor: middle; }
 .viz .tick { font-size: 11px; fill: var(--muted); text-anchor: middle; font-variant-numeric: tabular-nums; }
+.viz.gauge .tick { font-size: 9px; }
 .viz .tick.end { text-anchor: end; }
 .viz .val { font-size: 13px; font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .viz .val.muted { fill: var(--faint); font-weight: 600; }
