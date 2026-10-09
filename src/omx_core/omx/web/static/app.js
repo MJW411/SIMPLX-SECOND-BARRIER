@@ -18,7 +18,7 @@ const EVENT_LABEL = {
   pick_fail: "집기 실패", calib: "보정", settings: "설정 변경",
   cycle_done: "작업 완료", cycle_pause: "작업 일시 정지", cycle_resume: "작업 재개", conveyor_clear: "컨베이어 이상 해제", door_manual: "출입문 수동 열기", teach_mode: "티칭 모드", robot_temp: "모터 온도", robot_angle: "관절 각도 이상", cycle_start: "작업 시작", cycle_stop: "작업 정지", clip_save: "영상 저장", robot: "로봇", robot_fault: "로봇 고장",
 };
-const STEP_LABEL = { move: "관절 이동", linear: "직선 이동", home: "홈 이동", grip: "그리퍼", wait_sensor2: "센서 대기 (D12)", conveyor: "컨베이어", pause: "시간 대기" };
+const STEP_LABEL = { move: "관절 이동", linear: "직선 이동", home: "홈 이동", grip: "그리퍼", wait_sensor2: "센서 대기 (D11)", conveyor: "컨베이어", pause: "시간 대기" };
 const JOINTS = ["베이스", "어깨", "팔꿈치", "손목 기울기", "손목 회전", "그리퍼"];
 
 // ---------------------------------------------------------------- helpers
@@ -267,7 +267,7 @@ function render() {
   $("#lampTile b").innerHTML = `<i class="lamp-dot lamp-${lc}"></i>${LAMP[lc] || lc}`;
   $("#devHint").textContent = d.backend === "virtual"
     ? "가상 장치입니다. 누를 때마다 켜짐/꺼짐이 바뀝니다. 작업 중에는 도착 센서가 꺼져 있으면 컨베이어가 돌고, 켜면 멈춥니다. 화재를 켜면 출입문이 열리고 로봇이 홈으로 돌아갑니다."
-    : "아두이노 실제 장치입니다. 센서 값은 실제 센서(투입 D11·도착 D12)를 따릅니다. 작업 중 투입 센서에 물품이 올라오면 컨베이어가 돌고, 도착 센서가 감지하거나 작업이 끝나면 멈춥니다. 출입문을 누르면 닫힘 시간 동안 열립니다.";
+    : "아두이노 실제 장치입니다. 센서 값은 실제 센서(투입 D12·도착 D11)를 따릅니다. 작업 중 투입 센서에 물품이 올라오면 컨베이어가 돌고, 도착 센서가 감지하거나 작업이 끝나면 멈춥니다. 출입문을 누르면 닫힘 시간 동안 열립니다.";
   kv("#devKv", { "통신": esc(d.health), ...(d.flame != null ? { "화염 센서 값": `${d.flame} (300 넘으면 불꽃 — 센서 보류 중이면 감지 꺼짐)` } : {}) });
   const st = S.site || {};
   const h = st.helmet;
@@ -405,7 +405,7 @@ function renderEditor() {
         `<p class="hint">힘을 건드리지 않으면 기본 힘(${defF}%)을 씁니다. 열기 = 가동 범위의 열림 끝, 닫기 = 닫힘 끝(물체가 있으면 그 힘으로 쥠).</p>`;
     }
   } else if (s.type === "pause") h = `<label class="field"><span>대기 시간 (초)</span><input type="number" data-f="value" min="0.1" max="600" step="0.5" value="${s.value}"></label>`;
-  else if (s.type === "wait_sensor2") h = '<p class="hint">도착 센서(D12)에 물품이 올 때까지 기다립니다. 작업 중에는 센서가 비어 있으면 컨베이어가 돌고, 물품이 감지되면 멈춥니다.</p>';
+  else if (s.type === "wait_sensor2") h = '<p class="hint">도착 센서(D11)에 물품이 올 때까지 기다립니다. 작업 중에는 센서가 비어 있으면 컨베이어가 돌고, 물품이 감지되면 멈춥니다.</p>';
   else if (s.type === "conveyor") h = `<div class="seg" data-conv>${[["on", "가동"], ["off", "멈춤"]].map(([v, l]) =>
       `<button data-cv="${v}" class="${(s.value || "on") === v ? "active" : ""}">${l}</button>`).join("")}</div>`;
   $("#stepEditor").innerHTML = h;
