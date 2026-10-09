@@ -82,6 +82,12 @@ check(fs.tx and fs.tx[-1] == b"C 1 1 O\n", f"명령 줄 즉시 전송 ({fs.tx[-1
 n = len(fs.tx)
 time.sleep(0.5)
 check(len(fs.tx) - n >= 2, "명령 줄을 하트비트로 계속 보냄 (200ms마다)")
+io.set_arrive_stop(False)
+time.sleep(0.1)
+check(fs.tx[-1] == b"C 1 1 O 0\n", f"도착 센서 무시 → 다섯째 값 0 ({fs.tx[-1]})")
+io.set_arrive_stop(True)
+time.sleep(0.1)
+check(fs.tx[-1] == b"C 1 1 O\n", "기본으로 돌리면 예전 형식 그대로")
 io.last_rx = time.monotonic() - 2.0
 check(not io.healthy() and "응답 없음" in io.health_msg(), "응답이 1초 끊기면 고장")
 io.stop()
@@ -225,6 +231,25 @@ check(sj.conveyor_alarm, "작업이 끝나도 이상은 유지")
 rj.running = True
 cj.step(272.0)
 check(not sj.conveyor_alarm and "새로 시작" in evj.got[-1][1], "작업을 새로 시작하면 자동 해제")
+
+# ---- 도착 센서 고장 시 임시: 작업 중이면 센서와 상관없이 계속 돎
+va = VirtualIO()
+cfa = copy.deepcopy(CFG)
+cfa["conveyor"].update(start_sensor=False, travel_timeout=0, arrive_sensor=False)
+ra = SimpleNamespace(running=True)
+ca = ConveyorMonitor(va, Events(), cfa, SimpleNamespace(conveyor_alarm="", fire=False), ra, start=False)
+va.set_virtual(sensor1=False, sensor2=True)                # 도착 센서가 계속 '있음'으로 고장
+ca.step(300.0)
+check(va.conveyor_on() and not va.arrive_stop, "arrive_sensor=false: 작업 시작하면 바로 가동, 도착 센서 감지돼도 계속")
+ca.step(400.0)
+check(va.conveyor_on(), "제한시간 0 → 오래 돌아도 이상 아님")
+ra.running = False
+ca.step(401.0)
+check(not va.conveyor_on(), "작업이 끝나면 정지")
+cfa["conveyor"]["arrive_sensor"] = True
+ra.running = True
+ca.step(402.0)
+check(not va.conveyor_on() and va.arrive_stop, "arrive_sensor=true 로 되돌리면 도착 센서 감지 시 정지")
 
 io5 = SimpleNamespace(rdy=False, cmds=[], ready=lambda: io5.rdy, sensor1=lambda: True, sensor2=lambda: False, fire=lambda: False,
                       set_conveyor=lambda on: io5.cmds.append(on))

@@ -16,7 +16,9 @@
 //   투입 센서(D11)로 출발하는 판단은 젯슨이 한다 (사람 근접·화재·작업 여부를 보고). 아두이노는 값만 보낸다.
 //
 // 프로토콜 (9600bps, 줄 단위 텍스트):
-//   젯슨 → 아두이노: "C <conv> <door> <led>"  200ms마다 + 바뀔 때. 받는 것 자체가 하트비트.
+//   젯슨 → 아두이노: "C <conv> <door> <led> [<arr>]"  200ms마다 + 바뀔 때. 받는 것 자체가 하트비트.
+//                    arr = 0 이면 도착 센서(D12)로 멈추지 않음 (센서 고장 시 임시, 젯슨 설정 conveyor.arrive_sensor).
+//                    없거나 1 이면 기본대로 D12 감지 시 즉시 정지. 연결이 끊기면 기본으로 돌아간다.
 //                    conv/door = 0|1, led = G(대기) B(작업 중) O(사람 감속) R(사람 정지, 재가동 전까지) C(작업 완료)
 //                    Y(화재 — 불꽃이 꺼진 뒤에도 관리자 '상황 종료'까지: 바닥 노란 물결)
 //   아두이노 → 젯슨: "S <s1> <s2> <fire> <door> <conv> <flame>"  바뀔 때 + 200ms마다
@@ -71,6 +73,7 @@ Adafruit_NeoPixel guide(GUIDE_PIXELS, PIN_GUIDE, NEO_GRB + NEO_KHZ800);
 
 // 젯슨 명령
 bool convCmd = false, doorCmd = false;
+bool arriveStop = true;                      // 도착 센서(D12) 감지 시 정지 (젯슨이 끌 수 있음)
 char ledCmd = 'G';
 unsigned long lastCmd = 0;
 bool everLinked = false;
@@ -180,7 +183,7 @@ void updateGuide(bool fire, unsigned long now) {
   guideMode = 1;
 }
 
-// "C <conv> <door> <led>"
+// "C <conv> <door> <led> [<arr>]"
 void handleLine(const char* s) {
   if (s[0] != 'C' || strlen(s) < 7) return;
   if (s[2] != '0' && s[2] != '1') return;
@@ -190,6 +193,7 @@ void handleLine(const char* s) {
   convCmd = s[2] == '1';
   doorCmd = s[4] == '1';
   ledCmd = led;
+  arriveStop = !(strlen(s) >= 9 && s[7] == ' ' && s[8] == '0');
   lastCmd = millis();
   everLinked = true;
 }
@@ -231,7 +235,7 @@ void setup() {
   servoArriveTime = millis();
 
   Serial.begin(9600);
-  Serial.println("# omx_io v4 (투입 D11 / 도착 D12 / 화염 A0 / 문 서보 D6 / 모터 D9,D10 / 조명 D13 / 대피유도 D3)");
+  Serial.println("# omx_io v4.1 (투입 D11 / 도착 D12 / 화염 A0 / 문 서보 D6 / 모터 D9,D10 / 조명 D13 / 대피유도 D3)");
   lastFrame = millis();
 }
 
@@ -249,9 +253,9 @@ void loop() {
   else if (fireOn && now - lastFlameTime >= FLAME_HOLD_TIME) fireOn = false;
 
   bool linked = everLinked && now - lastCmd < LINK_TIMEOUT;
-  if (!linked) { convCmd = false; doorCmd = false; }   // 다시 연결되면 젯슨이 새로 명령해야 움직인다
+  if (!linked) { convCmd = false; doorCmd = false; arriveStop = true; }   // 다시 연결되면 젯슨이 새로 명령해야 움직인다
 
-  bool conv = convCmd && linked && !fireOn && !b;
+  bool conv = convCmd && linked && !fireOn && !(b && arriveStop);
   bool door = fireOn || (doorCmd && linked);
   setConveyor(conv);
   targetAngle = door ? ANGLE_OPEN : ANGLE_CLOSED;
