@@ -110,7 +110,7 @@ io3.stop()
 print("[컨베이어]")
 vio = VirtualIO()
 ev = Events()
-safety = SimpleNamespace(conveyor_alarm="", fire=False)
+safety = SimpleNamespace(conveyor_alarm="", fire=False, state="NORMAL")
 runner = SimpleNamespace(running=False)
 cm = ConveyorMonitor(vio, ev, CFG, safety, runner, start=False)
 t = 100.0
@@ -157,6 +157,14 @@ safety.conveyor_alarm = ""
 vio.set_virtual(sensor1=True)
 cm.step(t + 41.0)
 check(vio.conveyor_on(), "관리자 해제 뒤 (작업 중 + 물품) 다시 가동")
+safety.state = "STOP"
+cm.step(t + 41.5)
+check(not vio.s["conveyor"], "사람 정지(안전 STOP) → 컨베이어도 정지")
+safety.state = "NORMAL"
+vio.set_virtual(sensor1=False)
+cm.step(t + 41.6)
+check(vio.conveyor_on() and cm.t_run == t + 41.6, "재가동되면 (투입 센서가 비어도) 이어서 가동, 제한시간 새로 셈")
+vio.set_virtual(sensor1=True)
 safety.fire = True
 cm.step(t + 42.0)
 check(not vio.s["conveyor"], "화재 → 정지")
