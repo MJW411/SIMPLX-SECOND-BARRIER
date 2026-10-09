@@ -6,7 +6,7 @@ let ws = null, wsDropped = false;
 let seqDraft = null, seqDirty = false, selIdx = -1, edKey = "";
 let clickMode = null;         // null | "calib" | "roi"
 let roiClicks = [];
-let evFilter = "all", evCat = "", incDays = 7, sumTimer = null;
+let evFilter = "all", evCat = "", sumTimer = null;
 let page = "overview";
 let thrShown = null;          // 입력칸에 채워 둔 거리 기준 (적용 중인 기준이 바뀌면 다시 채움)
 
@@ -194,14 +194,6 @@ function render() {
     "무인 시험 감시": sf.guard_person_m ? `${sf.guard_person_m} m` : "꺼짐",
   });
   const mode = rb.freedrive ? "직접 교시 중" : rb.torque ? "토크 켜짐" : "토크 꺼짐";
-  const real = S.robot_backend.startsWith("real");
-  tag("#robotTag", real ? "실제 로봇" : "가상 로봇", real ? "info" : "warn");
-  kv("#robotKv", {
-    "상태": mode, "동작": esc(rb.motion || "대기"), "속도": `${Math.round(rb.speed_ratio * 100)}% (현재 배율 ×${rb.scale})`,
-    "구동 허가": esc(rb.permit_reason), "고장": rb.fault ? `<span class="err">${esc(rb.fault)}</span>` : "없음",
-    "TCP": `x ${fx(rb.tcp[0])} · y ${fx(rb.tcp[1])} · z ${fx(rb.tcp[2])} m`,
-  });
-  $("#ovTorque").classList.toggle("hidden", rb.torque || rb.freedrive);
   const temps = rb.temp.length ? Math.max(...rb.temp) : "—";
   $("#kpis").innerHTML = [
     ["인식 속도", `${pc.fps}<small>fps</small>`], ["추론 시간", `${pc.infer_ms}<small>ms</small>`],
@@ -496,14 +488,14 @@ $$("[data-teachmode]").forEach((b) => b.addEventListener("click", () => {
 }));
 on("#btnFireEnd", async () => { if (confirm("화재 상황을 종료할까요?")) await api("/api/safety/fire_end"); });
 const torqueOn = () => api("/api/robot/torque", { on: true });
-on("#btnTorqueOn", torqueOn); on("#ovTorque", torqueOn);
+on("#btnTorqueOn", torqueOn);
 on("#btnTorqueOff", async () => {
   try { await api("/api/robot/torque", { on: false }); }
   catch (e) { if (confirm("휴식 자세가 아니라 팔이 떨어질 수 있습니다. 그래도 토크를 끌까요?")) await api("/api/robot/torque", { on: false, force: true }); }
 });
 on("#btnPark", () => api("/api/robot/park"));
 const goHome = () => api("/api/robot/home"), stopMotion = () => api("/api/robot/stop");
-on("#btnHome", goHome); on("#ovHome", goHome); on("#btnStop", stopMotion); on("#ovStop", stopMotion);
+on("#btnHome", goHome); on("#btnStop", stopMotion);
 on("#btnReset", async () => { const r = await api("/api/robot/reset"); toast("해제: " + (r.result || "완료"), "ok", 8000); });
 $("#speed").addEventListener("change", (e) => api("/api/robot/speed", { ratio: e.target.value / 100 }).catch(() => {}));
 try { const v = localStorage.getItem("omxCycleCount"); if (v !== null) $("#cycleCount").value = v; } catch (_) {}
@@ -666,27 +658,15 @@ on("#btnAckAll", async () => { await api("/api/events/ack_all"); loadEvents(); l
 $$("#evCat button").forEach((b) => b.addEventListener("click", () => {
   evCat = b.dataset.c; $$("#evCat button").forEach((x) => x.classList.toggle("active", x === b)); loadEvents();
 }));
-$$("#incDays button").forEach((b) => b.addEventListener("click", () => {
-  incDays = +b.dataset.d; $$("#incDays button").forEach((x) => x.classList.toggle("active", x === b)); loadSummary();
-}));
-
 // 대시보드 사고 현황 (도넛) + 이벤트 분류별 미확인 수
 const INC_COLOR = { human_stop: "#c81e1e", vanish: "#7c3aed", person_fall: "#db2777", conveyor_jam: "#ea580c", fire: "#7f1d1d",
   estop: "#0f172a", fault: "#64748b", robot_fault: "#1d4ed8", pick_fail: "#0891b2" };
 async function loadSummary() {
-  const r = await api(`/api/events/summary?days=${incDays}`, undefined, "GET").catch(() => null); if (!r) return;
-  drawDonut(r);
+  const r = await api(`/api/events/summary?days=7`, undefined, "GET").catch(() => null); if (!r) return;
   for (const [c, n] of Object.entries(r.cat_unacked || {})) {
     const el = $("#ec-" + c); if (!el) continue;
     el.textContent = n ? ` ${n}` : ""; el.classList.toggle("hot", n > 0);
   }
-}
-function drawDonut(r) {
-  const period = { 1: "최근 24시간", 7: "최근 7일", 30: "최근 30일", 0: "전체 기간" }[incDays] || `${incDays}일`;
-  const items = drawDonutInto($("#incDonut"), $("#incLegend"), r.by_type || {}, r.total || 0, period), total = r.total || 0;
-  $("#incTop").innerHTML = items.length
-    ? `가장 많은 사고: <b>${esc(EVENT_LABEL[items[0][0]] || items[0][0])}</b> ${items[0][1]}건 (${Math.round(100 * items[0][1] / total)}%)`
-    : "";
 }
 function drawDonutInto(elD, elL, byType, total, period) {
   const items = Object.entries(byType).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
@@ -995,7 +975,11 @@ function drawGauge(el, th, d, zone, preview = false) {
   const seg = (a, b, c, lbl, ink = "#fff") => `<rect x="${X(a)}" y="22" width="${Math.max(0, X(b) - X(a))}" height="14" fill="${c}"/>` +
     (X(b) - X(a) > 34 ? `<text x="${(X(a) + X(b)) / 2}" y="32.5" class="seg" fill="${ink}">${lbl}</text>` : "");
   const cid = `${el.id}Clip`;
-  const tick = (m, t) => `<line x1="${X(m)}" y1="20" x2="${X(m)}" y2="40" stroke="${VC.ink}" stroke-width="1"/><text x="${X(m)}" y="52" class="tick">${t}</text>`;
+  // 눈금 숫자가 붙어 있으면(감속~재가동 허용 사이가 좁을 때) 왼쪽은 오른쪽 끝, 오른쪽은 왼쪽 끝에 맞춰 벌린다
+  const tks = [0, th.stop, th.slow, th.clear].map((m) => ({ m, x: X(m), a: "" }));
+  for (let i = 1; i < tks.length; i++) if (tks[i].x - tks[i - 1].x < 52) { tks[i - 1].a ||= "end"; tks[i].a = "start"; }
+  const tick = ({ m, x, a }) => `<line x1="${x}" y1="20" x2="${x}" y2="40" stroke="${VC.ink}" stroke-width="1"/>` +
+    `<text x="${x + (a === "start" ? 2 : a === "end" ? -2 : 0)}" y="52" class="tick${a ? " " + a : ""}">${m}</text>`;
   let mk = "";
   if (d !== null && d !== undefined) {
     const x = X(d), col = d < th.stop ? VC.stop : d < th.slow ? VC.slow : d <= th.clear ? "#b45309" : VC.clear;
@@ -1006,7 +990,7 @@ function drawGauge(el, th, d, zone, preview = false) {
     <defs><clipPath id="${cid}"><rect x="${x0}" y="22" width="${x1 - x0}" height="14" rx="7"/></clipPath></defs>
     <rect x="${x0}" y="22" width="${x1 - x0}" height="14" rx="7" fill="${VC.grid}"/>
     <g clip-path="url(#${cid})">${seg(0, th.stop, VC.stop, "정지")}${seg(th.stop, th.slow, VC.slow, "감속")}${seg(th.slow, th.clear, VC.hold, "대기", "#78350f")}${seg(th.clear, max, "#bbf7d0", "여유", "#166534")}</g>
-    ${tick(0, "0")}${tick(th.stop, th.stop)}${tick(th.slow, th.slow)}${tick(th.clear, th.clear)}<text x="${x1}" y="52" class="tick end">m</text>
+    ${tks.map(tick).join("")}<text x="${x1}" y="52" class="tick end">m</text>
     ${mk}${d === null || d === undefined ? `<text x="${W / 2}" y="4" class="val muted">${preview ? "미리 보기" : "사람 없음"}</text>` : ""}</svg>` +
     (bad ? `<div class="err small">정지 &lt; 감속 ≤ 재가동 허용 순서여야 합니다</div>` : "");
 }
