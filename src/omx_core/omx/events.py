@@ -15,13 +15,16 @@ STORED = {
     "human_stop", "vanish", "conveyor_jam", "fire", "fire_end", "fault", "estop",
     # 낙상 (알림·녹화만 — 정지 이유가 아님)
     "person_fall",
-    # 로봇 이상: 모터 고장·과열, 관절 각도 이상, 집기 실패
-    "robot_fault", "robot_temp", "robot_angle", "pick_fail",
+    # 로봇 이상: 모터 고장·과열, 집기 실패
+    # (관절 각도 이상 robot_angle 은 2026-10-09 사용자 요청으로 이벤트 목록에서 뺌 — 로봇 기록 파일에만 남는다)
+    "robot_fault", "robot_temp", "pick_fail",
     # 사용자 판단: 재가동, 작업 시작·정지, 시스템 시작·종료, 영상 저장, 사라짐 확인, 설정·정비·보정 삭제, 출입문 수동 열기, 티칭 모드
     "restart", "cycle_start", "cycle_stop", "system", "clip_save", "vanish_clear", "settings", "maintenance", "calib",
     "door_manual", "teach_mode",
     # 작업 완료 (정한 반복 횟수를 마침 — 제어판 팝업·벽면 초록)
     "cycle_done",
+    # 로봇 작업 일시 정지·재개 (컨베이어 이상 → 멈춘 자리에서 대기, 해제되면 이어서)
+    "cycle_pause", "cycle_resume",
     # 컨베이어 이상 자동 해제 (물품 도착·작업 새로 시작)
     "conveyor_clear",
 }

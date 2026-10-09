@@ -121,6 +121,7 @@ class CycleRunner:
             self.ex.stop_motion()
         self.status = f"일시 정지: {why}"
         log.info("작업 일시 정지 — %s", why)
+        self.events.emit("cycle_pause", f"로봇 작업 일시 정지 — {why} (멈춘 자리에서 대기, {self.cycles}회 완료)", level="warn")
         return True
 
     def resume(self, why=""):
@@ -128,6 +129,8 @@ class CycleRunner:
             return False
         self.pause_evt.clear()
         log.info("작업 재개%s", f" — {why}" if why else "")
+        self.events.emit("cycle_resume", f"로봇 작업 재개{f' — {why}' if why else ''}"
+                         f"{f' ({self.resume_pose} 자세에서 물품 도착 대기 후 이어서)' if self.resume_pose else ''}", level="info")
         return True
 
     def _wait_resume(self):

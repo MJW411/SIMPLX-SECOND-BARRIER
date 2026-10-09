@@ -349,7 +349,7 @@ added = []
 hub = EventHub(C.cfg, SimpleNamespace(add=lambda t, *a, **k: added.append(t) or len(added)))
 for t_ in ("human_slow", "robot", "cycle", "calib_auto", "restart", "cycle_stop", "robot_temp", "robot_angle", "clip_save", "human_stop"):
     hub.emit(t_, "시험 " + t_)
-check(added == ["restart", "cycle_stop", "robot_temp", "robot_angle", "clip_save", "human_stop"], f"로그에 남은 종류 {added}")
+check(added == ["restart", "cycle_stop", "robot_temp", "clip_save", "human_stop"], f"로그에 남은 종류 {added} (관절 각도 이상은 빠짐)")
 
 # ---- 화면 경보 표시값: 사람이 정지 거리 안 → human_alarm, 재가동하면 꺼짐
 from omx.perception.people import Percept  # noqa: E402
