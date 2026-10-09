@@ -1,5 +1,5 @@
 // 최소 서비스 워커: 앱 껍데기만 캐시(오프라인 시 화면 표시), API·영상은 항상 네트워크.
-const CACHE = "omx-v2";
+const CACHE = "omx-v3";
 const SHELL = ["/", "/static/style.css", "/static/app.js", "/static/icon.svg"];
 self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) => e.waitUntil(
