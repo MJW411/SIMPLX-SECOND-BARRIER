@@ -6,7 +6,7 @@ let ws = null, wsDropped = false;
 let seqDraft = null, seqDirty = false, selIdx = -1, edKey = "";
 let clickMode = null;         // null | "calib" | "roi"
 let roiClicks = [];
-let evFilter = "all";
+let evFilter = "all", evCat = "", incDays = 7, sumTimer = null;
 let page = "overview";
 let thrShown = null;          // 입력칸에 채워 둔 거리 기준 (적용 중인 기준이 바뀌면 다시 채움)
 
@@ -15,7 +15,7 @@ const EVENT_LABEL = {
   human_stop: "사람 근접 정지", human_slow: "사람 접근 감속", vanish: "사람 사라짐", conveyor_jam: "컨베이어 이상",
   fire: "화재", fire_end: "화재 종료", fault: "고장", estop: "비상정지", restart: "재가동",
   vanish_clear: "사라짐 확인", maintenance: "정비 모드", system: "시스템", cycle: "반복 작업", cycle_fail: "반복 중단",
-  pick_fail: "집기 실패", calib: "보정", settings: "설정 변경",
+  pick_fail: "집기 실패", person_fall: "넘어짐", calib: "보정", settings: "설정 변경",
   cycle_done: "작업 완료", cycle_pause: "작업 일시 정지", cycle_resume: "작업 재개", conveyor_clear: "컨베이어 이상 해제", door_manual: "출입문 수동 열기", teach_mode: "티칭 모드", robot_temp: "모터 온도", robot_angle: "관절 각도 이상", cycle_start: "작업 시작", cycle_stop: "작업 정지", clip_save: "영상 저장", robot: "로봇", robot_fault: "로봇 고장",
 };
 const STEP_LABEL = { move: "관절 이동", linear: "직선 이동", home: "홈 이동", grip: "그리퍼", wait_sensor2: "센서 대기 (D11)", conveyor: "컨베이어", pause: "시간 대기" };
@@ -68,6 +68,7 @@ function start() {
   loadModels();
   loadEvents();
   loadVideos();
+  loadSummary(); setInterval(loadSummary, 60000);
 }
 
 // ---------------------------------------------------------------- navigation
@@ -135,6 +136,7 @@ function onEvent(ev) {
     }
   }
   loadEvents();
+  clearTimeout(sumTimer); sumTimer = setTimeout(loadSummary, 1500);
 }
 
 // ---------------------------------------------------------------- render
@@ -151,7 +153,9 @@ function render() {
   $("#minDist").textContent = sf.min_dist === null ? "사람 없음" : `가장 가까운 사람 ${fx(sf.min_dist, 2)} m`;
   $("#profileTxt").textContent = `${sf.profile === "figure" ? "피규어 기준" : "실제 사람 기준"} · 감속 ${sf.thresholds.slow} m · 정지 ${sf.thresholds.stop} m · ` +
     (cal.calibrated && cal.valid !== false ? "로봇 팔까지 거리" : cal.calibrated ? "카메라까지 거리 (보정 틀어짐)" : "카메라까지 거리 (보정 전)");
-  $("#reasons").textContent = sf.reasons.join(" · ") || "이상 없음";
+  $("#reasons").textContent = sf.reasons.length ? "⚠ " + sf.reasons.join(" · ") : "활성 경보 없음";
+  $("#reasons").classList.toggle("alarm", sf.reasons.length > 0);
+  renderStrip();
   const un = $("#unacked"); un.textContent = S.db.unacked; un.classList.toggle("hidden", !S.db.unacked);
 
   // overview
@@ -175,7 +179,6 @@ function render() {
     b.classList.toggle("on", !!sf.teach_mode);
     b.textContent = sf.teach_mode ? "티칭 모드 끄기" : (b.closest(".teachmode-card") ? "티칭 모드 켜기" : "티칭 모드");
   });
-  tag("#teachModeTag", sf.teach_mode ? "켜짐 — 사람 감지 안 함" : "꺼짐", sf.teach_mode ? "warn" : "");
   $("#btnMaint").classList.toggle("on", sf.maintenance);
   $("#btnMaint").textContent = sf.maintenance ? "정비 모드 끝내기" : "정비 모드";
   $("#btnRestart").disabled = !sf.stop_latched;
@@ -637,7 +640,7 @@ on("#btnUpload", async () => {
 
 // ---------------------------------------------------------------- events
 async function loadEvents() {
-  const r = await api("/api/events?limit=150", undefined, "GET").catch(() => null); if (!r) return;
+  const r = await api("/api/events?limit=150" + (evCat ? "&cat=" + evCat : ""), undefined, "GET").catch(() => null); if (!r) return;
   let evs = r.events;
   if (evFilter === "alarm") evs = evs.filter((e) => e.level === "alarm");
   if (evFilter === "unacked") evs = evs.filter((e) => !e.acked);
@@ -658,7 +661,47 @@ on("#playerClose", () => { $("#playerVideo").pause(); $("#player").classList.add
 $$("#evFilter button").forEach((b) => b.addEventListener("click", () => {
   evFilter = b.dataset.f; $$("#evFilter button").forEach((x) => x.classList.toggle("active", x === b)); loadEvents();
 }));
-on("#btnAckAll", async () => { await api("/api/events/ack_all"); loadEvents(); });
+on("#btnAckAll", async () => { await api("/api/events/ack_all"); loadEvents(); loadSummary(); });
+$$("#evCat button").forEach((b) => b.addEventListener("click", () => {
+  evCat = b.dataset.c; $$("#evCat button").forEach((x) => x.classList.toggle("active", x === b)); loadEvents();
+}));
+$$("#incDays button").forEach((b) => b.addEventListener("click", () => {
+  incDays = +b.dataset.d; $$("#incDays button").forEach((x) => x.classList.toggle("active", x === b)); loadSummary();
+}));
+
+// 대시보드 사고 현황 (도넛) + 이벤트 분류별 미확인 수
+const INC_COLOR = { human_stop: "#c81e1e", vanish: "#7c3aed", person_fall: "#db2777", conveyor_jam: "#ea580c", fire: "#7f1d1d",
+  estop: "#0f172a", fault: "#64748b", robot_fault: "#1d4ed8", pick_fail: "#0891b2" };
+async function loadSummary() {
+  const r = await api(`/api/events/summary?days=${incDays}`, undefined, "GET").catch(() => null); if (!r) return;
+  drawDonut(r);
+  for (const [c, n] of Object.entries(r.cat_unacked || {})) {
+    const el = $("#ec-" + c); if (!el) continue;
+    el.textContent = n ? ` ${n}` : ""; el.classList.toggle("hot", n > 0);
+  }
+}
+function drawDonut(r) {
+  const items = Object.entries(r.by_type || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  const total = r.total || 0, R = 58, W = 22, C = 2 * Math.PI * R, gap = items.length > 1 ? 1.5 : 0;
+  const period = { 1: "최근 24시간", 7: "최근 7일", 30: "최근 30일", 0: "전체 기간" }[incDays] || `${incDays}일`;
+  let off = 0, arcs = `<circle cx="80" cy="80" r="${R}" fill="none" stroke="#e8ecf1" stroke-width="${W}"/>`;
+  for (const [t, n] of items) {
+    const len = C * n / total;
+    arcs += `<circle cx="80" cy="80" r="${R}" fill="none" stroke="${INC_COLOR[t] || "#64748b"}" stroke-width="${W}"
+      stroke-dasharray="${Math.max(0.5, len - gap)} ${C - Math.max(0.5, len - gap)}" stroke-dashoffset="${-off}" transform="rotate(-90 80 80)">
+      <title>${esc(EVENT_LABEL[t] || t)} ${n}건 (${Math.round(100 * n / total)}%)</title></circle>`;
+    off += len;
+  }
+  $("#incDonut").innerHTML = `<svg viewBox="0 0 160 160" role="img" aria-label="사고 유형 비율">${arcs}
+    <text x="80" y="80" class="dn-total">${total}</text><text x="80" y="99" class="dn-cap">건 · ${period}</text></svg>`;
+  $("#incLegend").innerHTML = items.length
+    ? items.map(([t, n]) => `<li><i style="background:${INC_COLOR[t] || "#64748b"}"></i><span>${esc(EVENT_LABEL[t] || t)}</span>` +
+      `<b>${n}</b><small>${Math.round(100 * n / total)}%</small></li>`).join("")
+    : `<li class="none">${period} 동안 사고 기록이 없습니다</li>`;
+  $("#incTop").innerHTML = items.length
+    ? `가장 많은 사고: <b>${esc(EVENT_LABEL[items[0][0]] || items[0][0])}</b> ${items[0][1]}건 (${Math.round(100 * items[0][1] / total)}%)`
+    : "";
+}
 on("#btnNotif", async () => {
   if (!window.Notification) return toast("이 브라우저는 알림을 지원하지 않습니다 (휴대폰은 보통 HTTPS가 필요)", "warn");
   toast("알림 권한: " + ({ granted: "허용", denied: "거부", default: "보류" }[await Notification.requestPermission()] || ""));
@@ -670,7 +713,9 @@ const VID_HINT = {
   human: "사람이 정지 거리 안으로 들어와 로봇이 멈춘 순간의 영상입니다 (멈추기 전·후 포함).",
   conveyor: "컨베이어가 돌기 시작한 뒤 제한 시간 안에 도착 센서에 물품이 오지 않은 경우(컨베이어 이상)의 영상입니다.",
   fire: "화재 감지부터 관리자가 종료할 때까지의 영상입니다. 저장 공간이 모자라도 지우지 않습니다.",
-  other: "사람 사라짐·비상정지·고장으로 멈춘 영상입니다.",
+  vanish: "출구가 아닌 곳에서 사람이 사라져 멈춘 순간의 영상입니다.",
+  fall: "사람(피규어)이 넘어진 것으로 판정된 순간의 영상입니다. 넘어짐만으로는 로봇이 멈추지 않습니다.",
+  other: "비상정지·고장 등 그 밖의 이유로 녹화된 영상입니다.",
 };
 function fmtBytes(b) { return b ? (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`) : ""; }
 async function loadVideos(more = false) {
@@ -827,6 +872,34 @@ on("#btnCalDelete", async () => {
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 boot();
 
+
+// ------------------------------------------------------------------ 상단 상태 줄 (관제 화면)
+function renderStrip() {
+  const sf = S.safety, rb = S.robot, cy = S.cycle || {}, d = S.devices || {}, pc = S.perception || {}, nd = S.nodes || {};
+  const cell = (label, [val, lvl], sub = "") =>
+    `<div class="sc ${lvl}"><span class="sc-l"><i class="led"></i>${label}</span><b>${val}</b><small>${sub || "&nbsp;"}</small></div>`;
+  const alive = Object.values(nd).filter((n) => n.alive).length, total = Object.keys(nd).length;
+  $("#statusStrip").innerHTML = [
+    cell("안전 구역", { CLEAR: ["여유", "ok"], SLOW: ["감속", "warn"], STOP: ["정지", "bad"] }[sf.zone] || [sf.zone, "off"],
+      sf.min_dist === null ? "사람 없음" : `최근접 ${fx(sf.min_dist, 2)} m`),
+    cell("사람", [`${pc.persons ?? 0}명`, pc.fallen ? "warn" : pc.persons ? "info" : "off"], pc.fallen ? `넘어짐 ${pc.fallen}명` : sf.vanish_unresolved ? `사라짐 미확인 ${sf.vanish_unresolved}` : ""),
+    cell("로봇", rb.fault ? ["고장", "bad"] : sf.state === "STOP" ? ["정지", "bad"] : rb.freedrive ? ["직접 교시", "warn"] : !rb.torque ? ["토크 꺼짐", "off"] : rb.motion ? ["동작 중", "info"] : ["대기", "ok"],
+      rb.fault ? esc(String(rb.fault).slice(0, 24)) : `속도 ×${rb.scale ?? "—"}`),
+    cell("작업", cy.paused ? ["일시 정지", "warn"] : cy.running ? [`${cy.cycles + 1}회차`, "info"] : cy.done ? ["완료", "ok"] : ["대기", "off"],
+      cy.running || cy.done ? `목표 ${cy.max_cycles || "∞"}회 · 완료 ${cy.cycles}회` : ""),
+    cell("컨베이어", sf.conveyor_alarm ? ["이상", "bad"] : d.conveyor_on ? ["가동", "info"] : ["정지", "off"], `도착 센서 ${d.sensor2 ? "감지" : "비어 있음"}`),
+    cell("출입문", d.door_open ? ["열림", "warn"] : ["닫힘", "ok"], S.site?.helmet ? "헬멧 게이트 켜짐" : ""),
+    cell("화재", sf.fire ? ["화재", "bad"] : ["정상", "ok"], sf.fire ? "대피 유도 중" : ""),
+    cell("인식", pc.cam_error ? ["카메라 오류", "bad"] : !pc.model_ready ? ["준비 중", "warn"] : [`${pc.fps ?? "—"} fps`, "ok"], pc.cam_error ? "" : `추론 ${pc.infer_ms ?? "—"} ms`),
+    cell("노드", [`${alive}/${total}`, alive === total ? "ok" : "bad"], alive === total ? "모두 응답" : Object.entries(nd).filter(([, n]) => !n.alive).map(([k]) => k).join(", ") + " 응답 없음"),
+  ].join("");
+}
+function tickClock() {
+  const n = new Date();
+  $("#clockTime").textContent = n.toTimeString().slice(0, 8);
+  $("#clockDate").textContent = `${n.getFullYear()}.${String(n.getMonth() + 1).padStart(2, "0")}.${String(n.getDate()).padStart(2, "0")} (${"일월화수목금토"[n.getDay()]})`;
+}
+tickClock(); setInterval(tickClock, 1000);
 
 // ------------------------------------------------------------------ 시각화 (SVG, 외부 라이브러리 없음)
 const VC = { stop: "#dc2626", slow: "#f59e0b", hold: "#fcd34d", clear: "#16a34a", arm: "#1e3a8a", grid: "#e3e8f0", text: "#5d6a80", ink: "#13213c" };

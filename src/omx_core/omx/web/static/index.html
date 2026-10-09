@@ -55,14 +55,16 @@
   </nav>
 
   <header class="topbar">
-    <div id="stateBadge" class="state">—</div>
+    <div class="state-box"><span class="state-cap">운전 상태</span><div id="stateBadge" class="state">—</div></div>
     <div class="top-info">
       <div class="top-line"><b id="minDist">—</b><span id="profileTxt" class="muted small"></span></div>
-      <div id="reasons" class="muted small ellipsis"></div>
+      <div id="reasons" class="reasons ellipsis"></div>
     </div>
+    <div class="clock"><b id="clockTime">--:--:--</b><span id="clockDate"></span></div>
     <button id="topRestart" class="btn ok top-restart hidden"><svg><use href="#i-play"/></svg>재가동</button>
     <button id="estop" class="estop" title="비상정지"><span>비상<br>정지</span></button>
   </header>
+  <div class="status-strip" id="statusStrip"></div>
 
   <main class="content">
     <!-- ============ Overview ============ -->
@@ -89,11 +91,16 @@
             </div>
             <div class="btn-row">
               <button class="btn toggle" id="btnMaint">정비 모드</button>
-              <button class="btn toggle" data-teachmode>티칭 모드</button>
               <button class="btn danger hidden" id="btnFireEnd">화재 상황 종료</button>
             </div>
             <div id="distGauge" class="viz gauge"></div>
             <dl class="kv" id="safetyKv"></dl>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>사고 현황</h3>
+              <div class="seg" id="incDays"><button data-d="1">24시간</button><button data-d="7" class="active">7일</button><button data-d="30">30일</button><button data-d="0">전체</button></div></div>
+            <div class="donut-wrap"><div id="incDonut" class="viz donut"></div><ul id="incLegend" class="donut-legend"></ul></div>
+            <p class="hint" id="incTop"></p>
           </div>
           <div class="card">
             <div class="card-h"><h3>로봇</h3><span id="robotTag" class="tag"></span></div>
@@ -145,11 +152,14 @@
       <div class="grid-2">
         <div class="stack">
           <div class="card pad0"><div class="cam-slot" data-cam="teach"></div></div>
-          <div class="card teachmode-card">
-            <div class="card-h"><h3>티칭 모드</h3><span id="teachModeTag" class="tag"></span></div>
-            <p class="hint">켜면 로봇 옆에 사람이 있어도 감속·정지·사라짐 정지를 하지 않습니다. 사람·사라짐 때문에 걸린 정지도 풀립니다.
-              작업(프로그램) 실행은 막히고, 화재·비상정지·로봇 고장은 그대로 동작합니다. 티칭이 끝나면 꼭 끄세요.</p>
-            <div class="btn-row"><button class="btn toggle" data-teachmode>티칭 모드 켜기</button></div>
+          <div class="card">
+            <div class="card-h"><h3>도구</h3></div>
+            <div class="btn-row">
+              <button class="btn" id="btnAlignDown">Z축 수직 정렬</button>
+              <button class="btn" id="btnAlignHoriz">수평 정렬</button>
+              <button class="btn toggle" id="btnFreedrive">직접 교시 (프리드라이브)</button>
+            </div>
+            <p class="hint">직접 교시를 켜면 팔 관절의 힘이 빠져 손으로 옮길 수 있습니다. 그리퍼는 계속 잡고 있습니다. 켜기 전에 팔을 손으로 받쳐 주세요.</p>
           </div>
           <div class="card">
             <div class="card-h"><h3>자세</h3><span class="muted small" id="homeTxt"></span></div>
@@ -218,15 +228,6 @@
             <details class="more" id="gripRef"><summary>기본 힘 (열기·닫기 단계에서 힘을 따로 정하지 않았을 때)</summary>
               <label class="slider">기본 힘 <input type="range" id="gripDefForce" min="5" max="100" step="5"><b id="gripDefForceTxt"></b></label>
             </details>
-          </div>
-          <div class="card">
-            <div class="card-h"><h3>도구</h3></div>
-            <div class="btn-row">
-              <button class="btn" id="btnAlignDown">Z축 수직 정렬</button>
-              <button class="btn" id="btnAlignHoriz">수평 정렬</button>
-              <button class="btn toggle" id="btnFreedrive">직접 교시 (프리드라이브)</button>
-            </div>
-            <p class="hint">직접 교시를 켜면 팔 관절의 힘이 빠져 손으로 옮길 수 있습니다. 그리퍼는 계속 잡고 있습니다. 켜기 전에 팔을 손으로 받쳐 주세요.</p>
           </div>
         </div>
       </div>
@@ -345,8 +346,18 @@
 
     <!-- ============ Events ============ -->
     <section class="page hidden" id="page-events">
+      <div class="subnav" id="evCat">
+        <button data-c="" class="active">전체</button>
+        <button data-c="safety">사람·안전<em class="n" id="ec-safety"></em></button>
+        <button data-c="fire">화재<em class="n" id="ec-fire"></em></button>
+        <button data-c="robot">로봇<em class="n" id="ec-robot"></em></button>
+        <button data-c="conveyor">컨베이어<em class="n" id="ec-conveyor"></em></button>
+        <button data-c="task">작업<em class="n" id="ec-task"></em></button>
+        <button data-c="ops">운영·설정<em class="n" id="ec-ops"></em></button>
+      </div>
       <div class="card">
         <div class="card-h">
+          <h3>이벤트 기록</h3>
           <div class="seg" id="evFilter">
             <button data-f="all" class="active">전체</button><button data-f="alarm">경보</button><button data-f="unacked">미확인</button>
           </div>
@@ -365,6 +376,8 @@
         <div class="card-h wrap">
           <div class="seg" id="vidCat">
             <button data-c="human" class="active">사람 근접 정지<em class="n" id="vc-human"></em></button>
+            <button data-c="vanish">사람 사라짐<em class="n" id="vc-vanish"></em></button>
+            <button data-c="fall">넘어짐<em class="n" id="vc-fall"></em></button>
             <button data-c="conveyor">물품 미도달<em class="n" id="vc-conveyor"></em></button>
             <button data-c="fire">화재<em class="n" id="vc-fire"></em></button>
             <button data-c="other">기타<em class="n" id="vc-other"></em></button>

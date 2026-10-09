@@ -164,6 +164,16 @@ class EventDB:
         with self.lock:
             return [dict(r) for r in self.conn.execute(q, args)]
 
+    def type_counts(self, types, since=None):
+        """종류별 이벤트 수 (since 이후). 대시보드 사고 현황용."""
+        q = f"SELECT type, COUNT(*), SUM(acked = 0) FROM events WHERE type IN ({','.join('?' * len(types))})"
+        args = list(types)
+        if since is not None:
+            q += " AND t >= ?"
+            args.append(since)
+        with self.lock:
+            return {r[0]: {"n": r[1], "unacked": r[2] or 0} for r in self.conn.execute(q + " GROUP BY type", args)}
+
     def clip_counts(self):
         """종류별 영상 수와 미확인 수."""
         with self.lock:

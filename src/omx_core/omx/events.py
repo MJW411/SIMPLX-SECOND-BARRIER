@@ -29,6 +29,19 @@ STORED = {
     "conveyor_clear",
 }
 
+# 제어판 이벤트 분류 (이벤트 화면 탭). 빠진 종류는 '운영'으로 본다.
+EVENT_CATS = {
+    "safety": ["human_stop", "vanish", "person_fall", "estop", "fault"],
+    "fire": ["fire", "fire_end"],
+    "robot": ["robot_fault", "robot_temp", "pick_fail"],
+    "conveyor": ["conveyor_jam", "conveyor_clear"],
+    "task": ["cycle_start", "cycle_stop", "cycle_done", "cycle_pause", "cycle_resume"],
+}
+EVENT_CATS["ops"] = sorted(STORED - {t for v in EVENT_CATS.values() for t in v})
+
+# 사고로 세는 종류 (대시보드 '사고 현황' 도넛)
+INCIDENTS = ["human_stop", "vanish", "person_fall", "conveyor_jam", "fire", "estop", "fault", "robot_fault", "pick_fail"]
+
 
 class EventHub:
     def __init__(self, cfg, db, recorder=None):

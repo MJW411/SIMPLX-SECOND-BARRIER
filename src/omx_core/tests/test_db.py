@@ -67,5 +67,21 @@ stuck, gone = db2.cleanup()
 ok4 = (k1 == k2 and db2.id_for_key("safety-1") == k1 and db2.get(k1)["clip_status"] == "failed"
        and not orphan.exists() and fresh.exists() and names[2].exists())
 print("이벤트 키 중복 방지·시작 시 정리:", "OK" if ok4 else "FAIL", stuck, gone)
+# ---- 사고 현황 집계 (대시보드 도넛) · 이벤트 분류
+import tempfile as _tf, time as _tm  # noqa: E402
+from omx.events import EVENT_CATS, INCIDENTS, STORED  # noqa: E402
+_d = _tf.mkdtemp()
+_db = EventDB(_d + "/ev.db", _d)
+_now = _tm.time()
+for _t, _ago in (("human_stop", 10), ("human_stop", 20), ("conveyor_jam", 30), ("vanish", 9 * 86400), ("cycle_done", 5)):
+    _db.add(_t, "alarm", "시험", t=_now - _ago)
+_c = _db.type_counts(INCIDENTS, _now - 7 * 86400)
+assert _c == {"human_stop": {"n": 2, "unacked": 2}, "conveyor_jam": {"n": 1, "unacked": 1}}, _c
+assert _db.type_counts(INCIDENTS)["vanish"]["n"] == 1, "기간 없으면 전체"
+_all = [t for v in EVENT_CATS.values() for t in v]
+assert sorted(_all) == sorted(STORED) and len(_all) == len(set(_all)), "모든 저장 종류가 분류 하나에만 속함"
+assert set(INCIDENTS) <= STORED
+print("사고 현황 집계·이벤트 분류: OK")
 ok = ok and ok3 and ok4
 sys.exit(0 if ok else 1)
+
