@@ -99,7 +99,6 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 
 /* ---------- cards & grid ---------- */
 .grid-2 { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-.row-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; align-items: stretch; }
 .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; box-shadow: var(--shadow); }
 .card.pad0 { padding: 0; overflow: hidden; position: relative; }
@@ -416,7 +415,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .status-strip { position: static; display: flex; overflow-x: auto; }
   .sc { flex: 0 0 auto; min-width: 112px; }
   .content { padding: 12px 12px 90px; }
-  .grid-2, .row-2 { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
   .tcp { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .toasts { top: auto; bottom: 86px; right: 12px; }
   .row-item .meta { order: 3; width: 100%; margin-left: 0; }
