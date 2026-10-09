@@ -75,21 +75,6 @@
         <div class="stack">
           <div class="card pad0"><div class="cam-slot" data-cam="overview"></div></div>
           <div class="kpis" id="kpis"></div>
-          <div class="card">
-            <div class="card-h"><h3>사고 현황</h3>
-              <div class="seg" id="incDays"><button data-d="1">24시간</button><button data-d="7" class="active">7일</button><button data-d="30">30일</button><button data-d="0">전체</button></div></div>
-            <div class="donut-wrap"><div id="incDonut" class="viz donut"></div><ul id="incLegend" class="donut-legend"></ul></div>
-            <p class="hint" id="incTop"></p>
-          </div>
-          <div class="card">
-            <div class="card-h"><h3>로봇</h3><span id="robotTag" class="tag"></span></div>
-            <dl class="kv" id="robotKv"></dl>
-            <div class="btn-row">
-              <button class="btn" id="ovTorque"><svg><use href="#i-power"/></svg>토크 켜기</button>
-              <button class="btn" id="ovHome"><svg><use href="#i-home"/></svg>홈으로</button>
-              <button class="btn" id="ovStop"><svg><use href="#i-stop"/></svg>동작 정지</button>
-            </div>
-          </div>
         </div>
         <div class="stack">
           <div class="card">
@@ -112,6 +97,23 @@
             <div class="legend"><span><i class="lg stop"></i>정지 거리</span><span><i class="lg slow"></i>감속 거리</span>
               <span><i class="lg arm"></i>로봇 팔</span><span><i class="lg person"></i>사람(피규어)</span></div>
             <p class="hint">팔 둘레의 색 띠는 위에서 본 근사입니다. 실제 판단은 높이까지 포함한 3D 거리로 합니다.</p>
+          </div>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="card">
+          <div class="card-h"><h3>사고 현황</h3>
+            <div class="seg" id="incDays"><button data-d="1">24시간</button><button data-d="7" class="active">7일</button><button data-d="30">30일</button><button data-d="0">전체</button></div></div>
+          <div class="donut-wrap"><div id="incDonut" class="viz donut"></div><ul id="incLegend" class="donut-legend"></ul></div>
+          <p class="hint" id="incTop"></p>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>로봇</h3><span id="robotTag" class="tag"></span></div>
+          <dl class="kv" id="robotKv"></dl>
+          <div class="btn-row">
+            <button class="btn" id="ovTorque"><svg><use href="#i-power"/></svg>토크 켜기</button>
+            <button class="btn" id="ovHome"><svg><use href="#i-home"/></svg>홈으로</button>
+            <button class="btn" id="ovStop"><svg><use href="#i-stop"/></svg>동작 정지</button>
           </div>
         </div>
       </div>
