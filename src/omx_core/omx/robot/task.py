@@ -229,6 +229,7 @@ class CycleRunner:
         log.info("반복 시작 (%d단계)", len(seq))
         try:
             while not self.stop_evt.is_set():
+                t_cycle = time.monotonic()
                 for i, s in enumerate(seq):
                     if self.cycles == 0 and i < start_at:
                         continue
@@ -238,6 +239,8 @@ class CycleRunner:
                     if self.stop_evt.is_set():
                         raise InterruptedError()
                 self.cycles += 1
+                # 통계(대시보드 작업량·사이클 시간)용: 1회 걸린 시간(초). 이벤트 목록·알림에는 안 나온다
+                self.events.emit("cycle_tick", f"{time.monotonic() - t_cycle:.2f}", level="info")
                 if max_cycles and self.cycles >= max_cycles:
                     self.done = True
                     self.events.emit("cycle_done", f"작업 완료 — {self.cycles}회 반복", level="info")

@@ -14,6 +14,7 @@ import rclpy
 import uvicorn
 from std_msgs.msg import Empty, Int32, String
 
+from omx.events import STATS_ONLY
 from omx.storage.db import EventDB
 from omx_interfaces.msg import ClipStatus, Event
 
@@ -210,6 +211,8 @@ class WebNode(OmxNode):
         state = self.snap("safety").get("state")
         eid = self.db.add(e.type, e.level, e.message, state=state, clip_status="recording" if e.clip else "none",
                           key=e.key, t=e.wall_t)
+        if e.type in STATS_ONLY:                         # 통계용 기록은 화면에 알리지 않는다
+            return
         self._notify({"kind": "event", "id": eid, "type": e.type, "level": e.level, "message": e.message,
                       "t": e.wall_t})
 

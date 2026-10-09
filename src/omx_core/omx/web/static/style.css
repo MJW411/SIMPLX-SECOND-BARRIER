@@ -372,6 +372,31 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .subnav .n:empty { display: none; }
 .kpi:nth-child(n+5) { border-top: 1px solid var(--line); }
 
+/* 통계 탭 */
+.stats-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.stats-head h2 { margin: 0 0 2px; font-size: 20px; font-weight: 800; letter-spacing: -.01em; }
+.st-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 16px; }
+.st-kpis .kpi:nth-child(n+5) { border-top: 0; }
+.st-kpis .kpi em { display: block; font-style: normal; font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.st-grid .span2 { grid-column: span 2; } .st-grid .span3 { grid-column: 1 / -1; }
+.donut-col { display: flex; flex-direction: column; align-items: center; gap: 12px; } .donut-col .donut-legend { width: 100%; }
+.rate-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rate-table th { white-space: nowrap; text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 700; padding: 6px 8px; border-bottom: 1px solid var(--line-2); background: var(--head); }
+.rate-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rate-table td i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 8px; background: #c3cad5; }
+.rate-table tr.inc td:first-child { font-weight: 700; }
+.rate-table .num { text-align: right; font-family: var(--mono); width: 1%; }
+.rate-table th:nth-child(n+3) { text-align: right; }
+.rate-table .bcol { width: 45%; }
+.rbar { height: 10px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
+.rbar span { display: block; height: 100%; background: #9aa6b8; border-radius: 2px; }
+@media (max-width: 1280px) { .st-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .st-kpis .kpi:nth-child(n+4) { border-top: 1px solid var(--line); } .st-kpis .kpi:nth-child(3) { border-right: 0; } }
+@media (max-width: 1100px) { .st-grid { grid-template-columns: 1fr; } .st-grid .span2, .st-grid .span3 { grid-column: auto; } .rate-table .bcol { display: none; } }
+
+.viz.chart text { paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
+.viz .tick.start { text-anchor: start; } .viz .tick.avg { font-weight: 700; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1280px) { .status-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); } .sc { border-bottom: 1px solid var(--line); } }
 @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi:nth-child(2) { border-right: 0; } .kpi:nth-child(-n+2) { border-bottom: 1px solid var(--line); } }

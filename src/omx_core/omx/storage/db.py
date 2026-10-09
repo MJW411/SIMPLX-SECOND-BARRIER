@@ -164,6 +164,12 @@ class EventDB:
         with self.lock:
             return [dict(r) for r in self.conn.execute(q, args)]
 
+    def rows_since(self, types, since):
+        """(t, type, message) 목록 — 대시보드 통계 계산용."""
+        q = f"SELECT t, type, message FROM events WHERE t >= ? AND type IN ({','.join('?' * len(types))}) ORDER BY t"
+        with self.lock:
+            return [tuple(r) for r in self.conn.execute(q, [since, *types])]
+
     def type_counts(self, types, since=None):
         """종류별 이벤트 수 (since 이후). 대시보드 사고 현황용."""
         q = f"SELECT type, COUNT(*), SUM(acked = 0) FROM events WHERE type IN ({','.join('?' * len(types))})"

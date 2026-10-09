@@ -24,7 +24,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import omx.web as _web
-from omx.events import EVENT_CATS, INCIDENTS, STORED
+from omx.events import EVENT_CATS, INCIDENTS, STATS_ONLY, STORED
+from omx.storage import stats as dash_stats
 EXTS = (".pt", ".engine", ".onnx")          # omx.perception.detector 와 같다 (웹 노드가 cv2·numpy 를 불러오지 않게)
 
 from .common import RemoteError, jsonable
@@ -582,6 +583,15 @@ def create_app(ctx):
         return {"days": days, "by_type": {t: v["n"] for t, v in inc.items()},
                 "total": sum(v["n"] for v in inc.values()),
                 "cat_unacked": {c: sum(allc.get(t, {}).get("unacked", 0) for t in ts) for c, ts in EVENT_CATS.items()}}
+
+    @app.get("/api/stats")
+    def stats(days: int = 7, user=Depends(require_user)):
+        """통계 화면: 일별 작업량·평균 사이클 시간·시간대별 작업량·이벤트 발생률 (오늘 포함 days 일)."""
+        days = max(1, min(int(days), 365))
+        lt = time.localtime()
+        since = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1)) - 86400 * (days - 1)
+        rows = ctx.db.rows_since(sorted(STORED | STATS_ONLY), since)
+        return dash_stats.compute(rows, days)
 
     CLIP_CATS = {"human": ["human_stop"], "vanish": ["vanish"], "fall": ["person_fall"], "conveyor": ["conveyor_jam"], "fire": ["fire"]}
 

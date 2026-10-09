@@ -82,6 +82,19 @@ _all = [t for v in EVENT_CATS.values() for t in v]
 assert sorted(_all) == sorted(STORED) and len(_all) == len(set(_all)), "모든 저장 종류가 분류 하나에만 속함"
 assert set(INCIDENTS) <= STORED
 print("사고 현황 집계·이벤트 분류: OK")
+# ---- 통계 탭: 일별 작업량(cycle_tick, 없으면 완료·정지 숫자)·사이클 시간·발생률
+from omx.storage import stats as _st  # noqa: E402
+_n = _tm.time()
+_lt = _tm.localtime(_n)
+_t0 = _tm.mktime((_lt.tm_year, _lt.tm_mon, _lt.tm_mday, 12, 0, 0, 0, 0, -1))   # 오늘 정오
+_rows = [(_t0, "cycle_tick", "6.00"), (_t0 + 10, "cycle_tick", "8.00"), (_t0 + 20, "human_stop", "x"), (_t0 + 30, "cycle_done", "작업 완료 — 2회 반복"),
+         (_t0 - 86400, "cycle_done", "작업 완료 — 5회 반복"), (_t0 - 86400, "cycle_stop", "admin: 작업 정지 (3회 완료)"), (_t0 - 86400, "conveyor_jam", "x")]
+_r = _st.compute(_rows, 2, now=_t0)
+assert [d["cycles"] for d in _r["series"]] == [8, 2], _r["series"]      # 어제는 옛 방식(5+3), 오늘은 tick 2개 (완료 숫자 중복 안 셈)
+assert _r["totals"]["avg_cycle_s"] == 7.0 and _r["totals"]["cycles"] == 10 and _r["totals"]["incidents"] == 2
+assert _r["totals"]["incidents_per_100"] == 20.0 and _r["by_hour"][12] == 2 and _r["rate"]["human_stop"]["per_day"] == 0.5
+assert "cycle_tick" not in _r["rate"], "통계용 기록은 발생률에 안 나옴"
+print("통계 탭 계산: OK")
 ok = ok and ok3 and ok4
 sys.exit(0 if ok else 1)
 

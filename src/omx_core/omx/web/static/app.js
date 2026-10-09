@@ -81,6 +81,7 @@ function go(p) {
   if (p === "events") loadEvents();
   if (p === "videos") loadVideos();
   if (p === "settings") loadModels();
+  if (p === "stats") loadStats();
   try { localStorage.setItem("omxPage", p); } catch (_) {}
 }
 $$(".sidebar a").forEach((a) => a.addEventListener("click", () => go(a.dataset.page)));
@@ -681,9 +682,15 @@ async function loadSummary() {
   }
 }
 function drawDonut(r) {
-  const items = Object.entries(r.by_type || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
-  const total = r.total || 0, R = 58, W = 22, C = 2 * Math.PI * R, gap = items.length > 1 ? 1.5 : 0;
   const period = { 1: "최근 24시간", 7: "최근 7일", 30: "최근 30일", 0: "전체 기간" }[incDays] || `${incDays}일`;
+  const items = drawDonutInto($("#incDonut"), $("#incLegend"), r.by_type || {}, r.total || 0, period), total = r.total || 0;
+  $("#incTop").innerHTML = items.length
+    ? `가장 많은 사고: <b>${esc(EVENT_LABEL[items[0][0]] || items[0][0])}</b> ${items[0][1]}건 (${Math.round(100 * items[0][1] / total)}%)`
+    : "";
+}
+function drawDonutInto(elD, elL, byType, total, period) {
+  const items = Object.entries(byType).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  const R = 58, W = 22, C = 2 * Math.PI * R, gap = items.length > 1 ? 1.5 : 0;
   let off = 0, arcs = `<circle cx="80" cy="80" r="${R}" fill="none" stroke="#e8ecf1" stroke-width="${W}"/>`;
   for (const [t, n] of items) {
     const len = C * n / total;
@@ -692,15 +699,13 @@ function drawDonut(r) {
       <title>${esc(EVENT_LABEL[t] || t)} ${n}건 (${Math.round(100 * n / total)}%)</title></circle>`;
     off += len;
   }
-  $("#incDonut").innerHTML = `<svg viewBox="0 0 160 160" role="img" aria-label="사고 유형 비율">${arcs}
+  elD.innerHTML = `<svg viewBox="0 0 160 160" role="img" aria-label="사고 유형 비율">${arcs}
     <text x="80" y="80" class="dn-total">${total}</text><text x="80" y="99" class="dn-cap">건 · ${period}</text></svg>`;
-  $("#incLegend").innerHTML = items.length
+  elL.innerHTML = items.length
     ? items.map(([t, n]) => `<li><i style="background:${INC_COLOR[t] || "#64748b"}"></i><span>${esc(EVENT_LABEL[t] || t)}</span>` +
       `<b>${n}</b><small>${Math.round(100 * n / total)}%</small></li>`).join("")
     : `<li class="none">${period} 동안 사고 기록이 없습니다</li>`;
-  $("#incTop").innerHTML = items.length
-    ? `가장 많은 사고: <b>${esc(EVENT_LABEL[items[0][0]] || items[0][0])}</b> ${items[0][1]}건 (${Math.round(100 * items[0][1] / total)}%)`
-    : "";
+  return items;
 }
 on("#btnNotif", async () => {
   if (!window.Notification) return toast("이 브라우저는 알림을 지원하지 않습니다 (휴대폰은 보통 HTTPS가 필요)", "warn");
@@ -900,6 +905,84 @@ function tickClock() {
   $("#clockDate").textContent = `${n.getFullYear()}.${String(n.getMonth() + 1).padStart(2, "0")}.${String(n.getDate()).padStart(2, "0")} (${"일월화수목금토"[n.getDay()]})`;
 }
 tickClock(); setInterval(tickClock, 1000);
+
+// ------------------------------------------------------------------ 통계 탭 (운영 대시보드)
+let stDays = 7;
+$$("#stDays button").forEach((b) => b.addEventListener("click", () => {
+  stDays = +b.dataset.d; $$("#stDays button").forEach((x) => x.classList.toggle("active", x === b)); loadStats();
+}));
+setInterval(() => { if (page === "stats") loadStats(); }, 60000);
+async function loadStats() {
+  const r = await api(`/api/stats?days=${stDays}`, undefined, "GET").catch(() => null); if (!r) return;
+  const T = r.totals, s = r.series;
+  $("#stRange").textContent = `${s[0].date} ~ ${s[s.length - 1].date} · ${stDays === 1 ? "오늘" : `최근 ${stDays}일`}`;
+  const k = (label, val, unit, sub = "") => `<div class="kpi"><span>${label}</span><b>${val}</b><small>${unit}</small>${sub ? `<em>${sub}</em>` : ""}</div>`;
+  $("#stKpis").innerHTML = [
+    k("총 작업 횟수", T.cycles, "회", `가동한 날 ${T.active_days}일`),
+    k("하루 평균 작업량", fx(T.avg_per_day, 1), "회/일", `가동일 기준 ${fx(T.avg_per_active_day, 1)}회`),
+    k("평균 사이클 시간", T.avg_cycle_s == null ? "—" : fx(T.avg_cycle_s, 1), "초", "작업 1회 걸린 시간"),
+    k("사고 건수", T.incidents, "건", T.top_incident ? `최다: ${esc(EVENT_LABEL[T.top_incident] || T.top_incident)}` : "사고 없음"),
+    k("작업 100회당 사고", T.incidents_per_100 == null ? "—" : fx(T.incidents_per_100, 1), "건", T.cycles_per_incident ? `사고 1건당 작업 ${fx(T.cycles_per_incident, 1)}회` : ""),
+    k("하루 평균 사고", fx(T.incidents / stDays, 1), "건/일", ""),
+  ].join("");
+  drawBars($("#stDaily"), s.map((d) => ({ x: d.date.slice(5).replace("-", "/"), v: d.cycles,
+    tip: `${d.date} · ${d.cycles}회${d.avg_cycle_s ? ` · 평균 ${fx(d.avg_cycle_s, 1)}초` : ""}` })), { avg: T.avg_per_day, color: "#1f4f8f", unit: "회" });
+  drawBars($("#stHour"), r.by_hour.map((v, h) => ({ x: h % 3 === 0 ? String(h) : "", v, tip: `${h}시 · ${v}회` })), { color: "#3b82f6", unit: "회", W: 380, H: 220 });
+  drawDonutInto($("#stDonut"), $("#stLegend"), r.incidents, T.incidents, stDays === 1 ? "오늘" : `최근 ${stDays}일`);
+  const rows = Object.entries(r.rate).slice(0, 12), mx = Math.max(1, ...rows.map(([, v]) => v.n));
+  $("#stRate").innerHTML = rows.length ? `<table><thead><tr><th>이벤트</th><th class="bcol"></th><th>건수</th><th>하루 평균</th><th>100회당</th></tr></thead><tbody>` +
+    rows.map(([t, v]) => { const inc = INC_COLOR[t];
+      return `<tr class="${inc ? "inc" : ""}"><td>${inc ? `<i style="background:${inc}"></i>` : "<i></i>"}${esc(EVENT_LABEL[t] || t)}</td>` +
+        `<td class="bcol"><div class="rbar"><span style="width:${(100 * v.n / mx).toFixed(1)}%;${inc ? `background:${inc}` : ""}"></span></div></td>` +
+        `<td class="num">${v.n}</td><td class="num">${fx(v.per_day, 1)}</td><td class="num">${v.per_100 == null ? "—" : fx(v.per_100, 1)}</td></tr>`; }).join("") +
+    `</tbody></table><p class="hint">색 있는 줄 = 사고 종류, 회색 = 운영 기록(재가동·작업 시작 등).</p>`
+    : `<div class="chart-empty">이 기간에 이벤트가 없습니다</div>`;
+  const types = Object.keys(r.incidents).sort((a, b) => r.incidents[b] - r.incidents[a]);
+  drawStacked($("#stInc"), s.map((d) => ({ x: d.date.slice(5).replace("-", "/"), parts: d.incidents, tip: d.date })), types);
+  $("#stIncLegend").innerHTML = types.map((t) => `<span><i class="lg" style="background:${INC_COLOR[t] || "#64748b"}"></i>${esc(EVENT_LABEL[t] || t)}</span>`).join("");
+}
+
+// 막대 차트 (단일 계열): items [{x, v, tip}], opt {avg, color, unit}
+function drawBars(el, items, opt = {}) {
+  if (!el) return;
+  const W = opt.W || 600, H = opt.H || 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
+  const top = Math.max(1, ...items.map((d) => d.v), opt.avg || 0) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top), bw = (W - L - R) / n;
+  const step = niceStep(top);
+  let s = "";
+  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 5}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
+  items.forEach((d, i) => {
+    const x = L + i * bw + bw * 0.16, w = bw * 0.68, y = Y(d.v);
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${Math.max(0, H - B - y)}" rx="2" fill="${opt.color || "#1f4f8f"}"><title>${esc(d.tip || "")}</title></rect>`;
+    if (d.v && n <= 31) s += `<text x="${x + w / 2}" y="${y - 3}" class="tick">${d.v}</text>`;
+    if (d.x && (n <= 14 || i % Math.ceil(n / 14) === 0)) s += `<text x="${x + w / 2}" y="${H - 8}" class="tick">${d.x}</text>`;
+  });
+  if (opt.avg) s += `<line x1="${L}" y1="${Y(opt.avg)}" x2="${W - R}" y2="${Y(opt.avg)}" stroke="#16803c" stroke-width="1.5" stroke-dasharray="5 4"/>` +
+    `<text x="${L + 6}" y="${Y(opt.avg) - 5}" class="tick start avg" fill="#16803c">평균 ${fx(opt.avg, 1)}${opt.unit || ""}</text>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${s}</svg>`;
+}
+// 누적 막대 (일별 사고 종류)
+function drawStacked(el, items, types) {
+  if (!el) return;
+  const W = 900, H = 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
+  const tot = items.map((d) => Object.values(d.parts).reduce((a, b) => a + b, 0));
+  if (!tot.some((v) => v)) { el.innerHTML = `<div class="chart-empty">이 기간에 사고가 없습니다</div>`; return; }
+  const top = Math.max(1, ...tot) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top), bw = (W - L - R) / n, step = niceStep(top);
+  let s = "";
+  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 5}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
+  items.forEach((d, i) => {
+    const x = L + i * bw + bw * 0.18, w = bw * 0.64;
+    let acc = 0;
+    for (const t of types) {
+      const v = d.parts[t] || 0; if (!v) continue;
+      s += `<rect x="${x}" y="${Y(acc + v)}" width="${w}" height="${Y(acc) - Y(acc + v)}" fill="${INC_COLOR[t] || "#64748b"}"><title>${esc(d.tip)} · ${esc(EVENT_LABEL[t] || t)} ${v}건</title></rect>`;
+      acc += v;
+    }
+    if (acc && n <= 31) s += `<text x="${x + w / 2}" y="${Y(acc) - 3}" class="tick">${acc}</text>`;
+    if (n <= 14 || i % Math.ceil(n / 14) === 0) s += `<text x="${x + w / 2}" y="${H - 8}" class="tick">${d.x}</text>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${s}</svg>`;
+}
+function niceStep(top) { const raw = top / 4, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p; return Math.max(1, (m > 5 ? 10 : m > 2 ? 5 : m > 1 ? 2 : 1) * p); }
 
 // ------------------------------------------------------------------ 시각화 (SVG, 외부 라이브러리 없음)
 const VC = { stop: "#dc2626", slow: "#f59e0b", hold: "#fcd34d", clear: "#16a34a", arm: "#1e3a8a", grid: "#e3e8f0", text: "#5d6a80", ink: "#13213c" };

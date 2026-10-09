@@ -25,6 +25,7 @@
     <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></symbol>
     <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></symbol>
+    <symbol id="i-stats" viewBox="0 0 24 24"><path d="M4 20h16"/><rect x="5" y="11" width="3" height="7" rx="1"/><rect x="10.5" y="6" width="3" height="12" rx="1"/><rect x="16" y="13" width="3" height="5" rx="1"/></symbol>
     <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.4 7.4a8 8 0 1 0 11.2 0"/></symbol>
   </defs>
 </svg>
@@ -44,6 +45,7 @@
   <nav class="sidebar">
     <div class="brand"><img src="/static/icon.svg" alt=""><div><b>Second Barrier</b><span>Robot_safety</span></div></div>
     <a data-page="overview" class="active"><svg><use href="#i-overview"/></svg><span>모니터링</span></a>
+    <a data-page="stats"><svg><use href="#i-stats"/></svg><span>통계</span></a>
     <a data-page="robot"><svg><use href="#i-robot"/></svg><span>로봇</span></a>
     <a data-page="teach"><svg><use href="#i-teach"/></svg><span>티칭</span></a>
     <a data-page="program"><svg><use href="#i-program"/></svg><span>작업</span></a>
@@ -340,6 +342,38 @@
               <button class="btn ghost" id="btnRoiClear">지우기</button>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Stats (운영 통계 대시보드) ============ -->
+    <section class="page hidden" id="page-stats">
+      <div class="stats-head">
+        <div><h2>운영 통계</h2><span class="muted small" id="stRange"></span></div>
+        <div class="seg" id="stDays"><button data-d="1">오늘</button><button data-d="7" class="active">7일</button><button data-d="30">30일</button><button data-d="90">90일</button></div>
+      </div>
+      <div class="kpis st-kpis" id="stKpis"></div>
+      <div class="st-grid">
+        <div class="card span2">
+          <div class="card-h"><h3>일별 작업량</h3><span class="muted small">완료한 작업 횟수 · 점선 = 하루 평균</span></div>
+          <div id="stDaily" class="viz chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>사고 유형 비율</h3></div>
+          <div class="donut-col"><div id="stDonut" class="viz donut"></div><ul id="stLegend" class="donut-legend"></ul></div>
+        </div>
+        <div class="card span2">
+          <div class="card-h"><h3>이벤트 발생률</h3><span class="muted small">많은 순 · 하루 평균 · 작업 100회당</span></div>
+          <div id="stRate" class="rate-table"></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>시간대별 작업량</h3><span class="muted small">0~23시</span></div>
+          <div id="stHour" class="viz chart"></div>
+        </div>
+        <div class="card span3">
+          <div class="card-h"><h3>일별 사고 추이</h3><span class="muted small">사고 종류별 누적</span></div>
+          <div id="stInc" class="viz chart"></div>
+          <div class="legend" id="stIncLegend"></div>
         </div>
       </div>
     </section>

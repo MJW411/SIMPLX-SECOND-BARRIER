@@ -28,7 +28,7 @@ from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPo
 from std_msgs.msg import Int32, String
 
 from omx.config import Config
-from omx.events import STORED
+from omx.events import STATS_ONLY, STORED
 from omx_interfaces.msg import Event
 from omx_interfaces.srv import Command
 
@@ -177,7 +177,7 @@ class EventEmitter:
 
     def emit(self, etype, message, level="info", clip=False, until_end=False):
         lg = logging.getLogger("events")
-        if etype not in STORED and not clip:
+        if etype not in STORED and etype not in STATS_ONLY and not clip:
             lg.info("[%s] %s: %s", level, etype, message)
             return None
         t = now()
