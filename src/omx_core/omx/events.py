@@ -29,6 +29,22 @@ STORED = {
     "conveyor_clear",
 }
 
+# 통계용으로만 DB 에 남기는 종류 (이벤트 목록·알림에는 안 나옴): 작업 1회 끝날 때마다 걸린 시간(초)
+STATS_ONLY = {"cycle_tick"}
+
+# 제어판 이벤트 분류 (이벤트 화면 탭). 빠진 종류는 '운영'으로 본다.
+EVENT_CATS = {
+    "safety": ["human_stop", "vanish", "person_fall", "estop", "fault"],
+    "fire": ["fire", "fire_end"],
+    "robot": ["robot_fault", "robot_temp", "pick_fail"],
+    "conveyor": ["conveyor_jam", "conveyor_clear"],
+    "task": ["cycle_start", "cycle_stop", "cycle_done", "cycle_pause", "cycle_resume"],
+}
+EVENT_CATS["ops"] = sorted(STORED - {t for v in EVENT_CATS.values() for t in v})
+
+# 사고로 세는 종류 (대시보드 '사고 현황' 도넛)
+INCIDENTS = ["human_stop", "vanish", "person_fall", "conveyor_jam", "fire", "estop", "fault", "robot_fault", "pick_fail"]
+
 
 class EventHub:
     def __init__(self, cfg, db, recorder=None):
@@ -42,7 +58,7 @@ class EventHub:
         self.lock = threading.Lock()
 
     def emit(self, etype, message, level="info", clip=False, until_end=False):
-        if etype not in STORED and not clip:
+        if etype not in STORED and etype not in STATS_ONLY and not clip:
             log.info("[%s] %s: %s", level, etype, message)          # 기록 파일에만
             return None
         now = time.monotonic()

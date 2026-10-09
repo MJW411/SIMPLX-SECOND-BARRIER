@@ -6,7 +6,7 @@ let ws = null, wsDropped = false;
 let seqDraft = null, seqDirty = false, selIdx = -1, edKey = "";
 let clickMode = null;         // null | "calib" | "roi"
 let roiClicks = [];
-let evFilter = "all";
+let evFilter = "all", evCat = "", incDays = 7, sumTimer = null;
 let page = "overview";
 let thrShown = null;          // 입력칸에 채워 둔 거리 기준 (적용 중인 기준이 바뀌면 다시 채움)
 
@@ -15,7 +15,7 @@ const EVENT_LABEL = {
   human_stop: "사람 근접 정지", human_slow: "사람 접근 감속", vanish: "사람 사라짐", conveyor_jam: "컨베이어 이상",
   fire: "화재", fire_end: "화재 종료", fault: "고장", estop: "비상정지", restart: "재가동",
   vanish_clear: "사라짐 확인", maintenance: "정비 모드", system: "시스템", cycle: "반복 작업", cycle_fail: "반복 중단",
-  pick_fail: "집기 실패", calib: "보정", settings: "설정 변경",
+  pick_fail: "집기 실패", person_fall: "넘어짐", calib: "보정", settings: "설정 변경",
   cycle_done: "작업 완료", cycle_pause: "작업 일시 정지", cycle_resume: "작업 재개", conveyor_clear: "컨베이어 이상 해제", door_manual: "출입문 수동 열기", teach_mode: "티칭 모드", robot_temp: "모터 온도", robot_angle: "관절 각도 이상", cycle_start: "작업 시작", cycle_stop: "작업 정지", clip_save: "영상 저장", robot: "로봇", robot_fault: "로봇 고장",
 };
 const STEP_LABEL = { move: "관절 이동", linear: "직선 이동", home: "홈 이동", grip: "그리퍼", wait_sensor2: "센서 대기 (D11)", conveyor: "컨베이어", pause: "시간 대기" };
@@ -68,6 +68,7 @@ function start() {
   loadModels();
   loadEvents();
   loadVideos();
+  loadSummary(); setInterval(loadSummary, 60000);
 }
 
 // ---------------------------------------------------------------- navigation
@@ -80,6 +81,7 @@ function go(p) {
   if (p === "events") loadEvents();
   if (p === "videos") loadVideos();
   if (p === "settings") loadModels();
+  if (p === "stats") loadStats();
   try { localStorage.setItem("omxPage", p); } catch (_) {}
 }
 $$(".sidebar a").forEach((a) => a.addEventListener("click", () => go(a.dataset.page)));
@@ -135,6 +137,7 @@ function onEvent(ev) {
     }
   }
   loadEvents();
+  clearTimeout(sumTimer); sumTimer = setTimeout(loadSummary, 1500);
 }
 
 // ---------------------------------------------------------------- render
@@ -151,7 +154,9 @@ function render() {
   $("#minDist").textContent = sf.min_dist === null ? "사람 없음" : `가장 가까운 사람 ${fx(sf.min_dist, 2)} m`;
   $("#profileTxt").textContent = `${sf.profile === "figure" ? "피규어 기준" : "실제 사람 기준"} · 감속 ${sf.thresholds.slow} m · 정지 ${sf.thresholds.stop} m · ` +
     (cal.calibrated && cal.valid !== false ? "로봇 팔까지 거리" : cal.calibrated ? "카메라까지 거리 (보정 틀어짐)" : "카메라까지 거리 (보정 전)");
-  $("#reasons").textContent = sf.reasons.join(" · ") || "이상 없음";
+  $("#reasons").textContent = sf.reasons.length ? "⚠ " + sf.reasons.join(" · ") : "활성 경보 없음";
+  $("#reasons").classList.toggle("alarm", sf.reasons.length > 0);
+  renderStrip();
   const un = $("#unacked"); un.textContent = S.db.unacked; un.classList.toggle("hidden", !S.db.unacked);
 
   // overview
@@ -175,12 +180,13 @@ function render() {
     b.classList.toggle("on", !!sf.teach_mode);
     b.textContent = sf.teach_mode ? "티칭 모드 끄기" : (b.closest(".teachmode-card") ? "티칭 모드 켜기" : "티칭 모드");
   });
-  tag("#teachModeTag", sf.teach_mode ? "켜짐 — 사람 감지 안 함" : "꺼짐", sf.teach_mode ? "warn" : "");
   $("#btnMaint").classList.toggle("on", sf.maintenance);
   $("#btnMaint").textContent = sf.maintenance ? "정비 모드 끝내기" : "정비 모드";
   $("#btnRestart").disabled = !sf.stop_latched;
   $("#topRestart").classList.toggle("hidden", !sf.stop_latched || sf.fire);
   $("#btnFireEnd").classList.toggle("hidden", !sf.fire);
+  drawGauge($("#distGauge"), sf.thresholds, sf.min_dist, sf.zone);
+  if (page === "overview") drawZoneMap($("#zoneMap"), S.map, sf.thresholds);
   kv("#safetyKv", {
     "구역 판정": { CLEAR: "여유", SLOW: "감속 구역", STOP: "정지 구역" }[sf.zone] || sf.zone,
     "사라짐": `미확인 ${sf.vanish_unresolved}건 · 판정 대기 ${sf.vanish_pending}건`,
@@ -278,6 +284,8 @@ function render() {
     : { "판정": "헬멧 게이트가 꺼져 있습니다 (모노 카메라 또는 모델 없음)" });
   setIfIdle("#doorClose", st.close_sec);
   const cv = S.conveyor;
+  drawConvChart($("#convChart"), cv);
+  tag("#convTag", sf.conveyor_alarm ? "이상" : cv.timing ? "가동 중" : "멈춤", sf.conveyor_alarm ? "bad" : cv.timing ? "info" : "");
   kv("#convKv", { "제한시간": `${cv.timeout}초`, "측정": cv.timing ? "컨베이어 가동, 도착 센서 기다리는 중…" : "—",
     "최근 도착까지": cv.last_travel ? `${fx(cv.last_travel, 2)}초` : "—", "이상": esc(sf.conveyor_alarm || "없음"), "주의": esc(cv.warning || "없음") });
   $("#roiInfo").textContent = S.door_roi ? `[${S.door_roi.join(", ")}]` : "지정 안 됨";
@@ -288,6 +296,7 @@ function render() {
   $("#thrNow").innerHTML = `<b>${sf.profile === "figure" ? "피규어 시연" : "실제 사람"}</b> 적용 중 — 감속 ${sf.thresholds.slow} m · ` +
     `정지 ${sf.thresholds.stop} m · 재가동 허용 ${sf.thresholds.clear} m`;
   setIfIdle("#guardM", sf.guard_person_m);
+  thrPreview();
   tag("#calTag", !cal.calibrated ? "보정 전" : cal.valid === false ? "보정 틀어짐" : "보정 완료", cal.calibrated && cal.valid !== false ? "ok" : "warn");
   kv("#calKv", {
     "수동 보정 점": `${cal.samples}개`,
@@ -572,6 +581,13 @@ setInterval(() => {
 on("#btnConvClear", () => api("/api/safety/conveyor_clear"));
 
 // settings
+function thrPreview() {                         // 입력칸 값으로 거리 기준 막대 미리 보기 (저장 전에도)
+  const v = (id) => parseFloat($(id).value);
+  const th = { stop: v("#thrStop"), slow: v("#thrSlow"), clear: v("#thrClear") };
+  if ([th.stop, th.slow, th.clear].every(Number.isFinite)) drawGauge($("#thrGauge"), th, S?.safety?.min_dist ?? null, null, true);
+}
+["#thrStop", "#thrSlow", "#thrClear"].forEach((id) => $(id).addEventListener("input", thrPreview));
+
 function fillThr() {
   const p = S?.safety_profiles?.[thrShown]; if (!p) return;
   $("#thrSlow").value = p.slow; $("#thrStop").value = p.stop; $("#thrClear").value = p.clear; $("#vanGrace").value = S.vanish_grace;
@@ -625,7 +641,7 @@ on("#btnUpload", async () => {
 
 // ---------------------------------------------------------------- events
 async function loadEvents() {
-  const r = await api("/api/events?limit=150", undefined, "GET").catch(() => null); if (!r) return;
+  const r = await api("/api/events?limit=150" + (evCat ? "&cat=" + evCat : ""), undefined, "GET").catch(() => null); if (!r) return;
   let evs = r.events;
   if (evFilter === "alarm") evs = evs.filter((e) => e.level === "alarm");
   if (evFilter === "unacked") evs = evs.filter((e) => !e.acked);
@@ -646,7 +662,51 @@ on("#playerClose", () => { $("#playerVideo").pause(); $("#player").classList.add
 $$("#evFilter button").forEach((b) => b.addEventListener("click", () => {
   evFilter = b.dataset.f; $$("#evFilter button").forEach((x) => x.classList.toggle("active", x === b)); loadEvents();
 }));
-on("#btnAckAll", async () => { await api("/api/events/ack_all"); loadEvents(); });
+on("#btnAckAll", async () => { await api("/api/events/ack_all"); loadEvents(); loadSummary(); });
+$$("#evCat button").forEach((b) => b.addEventListener("click", () => {
+  evCat = b.dataset.c; $$("#evCat button").forEach((x) => x.classList.toggle("active", x === b)); loadEvents();
+}));
+$$("#incDays button").forEach((b) => b.addEventListener("click", () => {
+  incDays = +b.dataset.d; $$("#incDays button").forEach((x) => x.classList.toggle("active", x === b)); loadSummary();
+}));
+
+// 대시보드 사고 현황 (도넛) + 이벤트 분류별 미확인 수
+const INC_COLOR = { human_stop: "#c81e1e", vanish: "#7c3aed", person_fall: "#db2777", conveyor_jam: "#ea580c", fire: "#7f1d1d",
+  estop: "#0f172a", fault: "#64748b", robot_fault: "#1d4ed8", pick_fail: "#0891b2" };
+async function loadSummary() {
+  const r = await api(`/api/events/summary?days=${incDays}`, undefined, "GET").catch(() => null); if (!r) return;
+  drawDonut(r);
+  for (const [c, n] of Object.entries(r.cat_unacked || {})) {
+    const el = $("#ec-" + c); if (!el) continue;
+    el.textContent = n ? ` ${n}` : ""; el.classList.toggle("hot", n > 0);
+  }
+}
+function drawDonut(r) {
+  const period = { 1: "최근 24시간", 7: "최근 7일", 30: "최근 30일", 0: "전체 기간" }[incDays] || `${incDays}일`;
+  const items = drawDonutInto($("#incDonut"), $("#incLegend"), r.by_type || {}, r.total || 0, period), total = r.total || 0;
+  $("#incTop").innerHTML = items.length
+    ? `가장 많은 사고: <b>${esc(EVENT_LABEL[items[0][0]] || items[0][0])}</b> ${items[0][1]}건 (${Math.round(100 * items[0][1] / total)}%)`
+    : "";
+}
+function drawDonutInto(elD, elL, byType, total, period) {
+  const items = Object.entries(byType).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  const R = 58, W = 22, C = 2 * Math.PI * R, gap = items.length > 1 ? 1.5 : 0;
+  let off = 0, arcs = `<circle cx="80" cy="80" r="${R}" fill="none" stroke="#e8ecf1" stroke-width="${W}"/>`;
+  for (const [t, n] of items) {
+    const len = C * n / total;
+    arcs += `<circle cx="80" cy="80" r="${R}" fill="none" stroke="${INC_COLOR[t] || "#64748b"}" stroke-width="${W}"
+      stroke-dasharray="${Math.max(0.5, len - gap)} ${C - Math.max(0.5, len - gap)}" stroke-dashoffset="${-off}" transform="rotate(-90 80 80)">
+      <title>${esc(EVENT_LABEL[t] || t)} ${n}건 (${Math.round(100 * n / total)}%)</title></circle>`;
+    off += len;
+  }
+  elD.innerHTML = `<svg viewBox="0 0 160 160" role="img" aria-label="사고 유형 비율">${arcs}
+    <text x="80" y="80" class="dn-total">${total}</text><text x="80" y="99" class="dn-cap">건 · ${period}</text></svg>`;
+  elL.innerHTML = items.length
+    ? items.map(([t, n]) => `<li><i style="background:${INC_COLOR[t] || "#64748b"}"></i><span>${esc(EVENT_LABEL[t] || t)}</span>` +
+      `<b>${n}</b><small>${Math.round(100 * n / total)}%</small></li>`).join("")
+    : `<li class="none">${period} 동안 사고 기록이 없습니다</li>`;
+  return items;
+}
 on("#btnNotif", async () => {
   if (!window.Notification) return toast("이 브라우저는 알림을 지원하지 않습니다 (휴대폰은 보통 HTTPS가 필요)", "warn");
   toast("알림 권한: " + ({ granted: "허용", denied: "거부", default: "보류" }[await Notification.requestPermission()] || ""));
@@ -658,7 +718,9 @@ const VID_HINT = {
   human: "사람이 정지 거리 안으로 들어와 로봇이 멈춘 순간의 영상입니다 (멈추기 전·후 포함).",
   conveyor: "컨베이어가 돌기 시작한 뒤 제한 시간 안에 도착 센서에 물품이 오지 않은 경우(컨베이어 이상)의 영상입니다.",
   fire: "화재 감지부터 관리자가 종료할 때까지의 영상입니다. 저장 공간이 모자라도 지우지 않습니다.",
-  other: "사람 사라짐·비상정지·고장으로 멈춘 영상입니다.",
+  vanish: "출구가 아닌 곳에서 사람이 사라져 멈춘 순간의 영상입니다.",
+  fall: "사람(피규어)이 넘어진 것으로 판정된 순간의 영상입니다. 넘어짐만으로는 로봇이 멈추지 않습니다.",
+  other: "비상정지·고장 등 그 밖의 이유로 녹화된 영상입니다.",
 };
 function fmtBytes(b) { return b ? (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`) : ""; }
 async function loadVideos(more = false) {
@@ -814,3 +876,203 @@ on("#btnCalDelete", async () => {
 // ---------------------------------------------------------------- PWA
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 boot();
+
+
+// ------------------------------------------------------------------ 상단 상태 줄 (관제 화면)
+function renderStrip() {
+  const sf = S.safety, rb = S.robot, cy = S.cycle || {}, d = S.devices || {}, pc = S.perception || {}, nd = S.nodes || {};
+  const cell = (label, [val, lvl], sub = "") =>
+    `<div class="sc ${lvl}"><span class="sc-l"><i class="led"></i>${label}</span><b>${val}</b><small>${sub || "&nbsp;"}</small></div>`;
+  const alive = Object.values(nd).filter((n) => n.alive).length, total = Object.keys(nd).length;
+  $("#statusStrip").innerHTML = [
+    cell("안전 구역", { CLEAR: ["여유", "ok"], SLOW: ["감속", "warn"], STOP: ["정지", "bad"] }[sf.zone] || [sf.zone, "off"],
+      sf.min_dist === null ? "사람 없음" : `최근접 ${fx(sf.min_dist, 2)} m`),
+    cell("사람", [`${pc.persons ?? 0}명`, pc.fallen ? "warn" : pc.persons ? "info" : "off"], pc.fallen ? `넘어짐 ${pc.fallen}명` : sf.vanish_unresolved ? `사라짐 미확인 ${sf.vanish_unresolved}` : ""),
+    cell("로봇", rb.fault ? ["고장", "bad"] : sf.state === "STOP" ? ["정지", "bad"] : rb.freedrive ? ["직접 교시", "warn"] : !rb.torque ? ["토크 꺼짐", "off"] : rb.motion ? ["동작 중", "info"] : ["대기", "ok"],
+      rb.fault ? esc(String(rb.fault).slice(0, 24)) : `속도 ×${rb.scale ?? "—"}`),
+    cell("작업", cy.paused ? ["일시 정지", "warn"] : cy.running ? [`${cy.cycles + 1}회차`, "info"] : cy.done ? ["완료", "ok"] : ["대기", "off"],
+      cy.running || cy.done ? `목표 ${cy.max_cycles || "∞"}회 · 완료 ${cy.cycles}회` : ""),
+    cell("컨베이어", sf.conveyor_alarm ? ["이상", "bad"] : d.conveyor_on ? ["가동", "info"] : ["정지", "off"], `도착 센서 ${d.sensor2 ? "감지" : "비어 있음"}`),
+    cell("출입문", d.door_open ? ["열림", "warn"] : ["닫힘", "ok"], S.site?.helmet ? "헬멧 게이트 켜짐" : ""),
+    cell("화재", sf.fire ? ["화재", "bad"] : ["정상", "ok"], sf.fire ? "대피 유도 중" : ""),
+    cell("인식", pc.cam_error ? ["카메라 오류", "bad"] : !pc.model_ready ? ["준비 중", "warn"] : [`${pc.fps ?? "—"} fps`, "ok"], pc.cam_error ? "" : `추론 ${pc.infer_ms ?? "—"} ms`),
+    cell("노드", [`${alive}/${total}`, alive === total ? "ok" : "bad"], alive === total ? "모두 응답" : Object.entries(nd).filter(([, n]) => !n.alive).map(([k]) => k).join(", ") + " 응답 없음"),
+  ].join("");
+}
+function tickClock() {
+  const n = new Date();
+  $("#clockTime").textContent = n.toTimeString().slice(0, 8);
+  $("#clockDate").textContent = `${n.getFullYear()}.${String(n.getMonth() + 1).padStart(2, "0")}.${String(n.getDate()).padStart(2, "0")} (${"일월화수목금토"[n.getDay()]})`;
+}
+tickClock(); setInterval(tickClock, 1000);
+
+// ------------------------------------------------------------------ 통계 탭 (운영 대시보드)
+let stDays = 7;
+$$("#stDays button").forEach((b) => b.addEventListener("click", () => {
+  stDays = +b.dataset.d; $$("#stDays button").forEach((x) => x.classList.toggle("active", x === b)); loadStats();
+}));
+setInterval(() => { if (page === "stats") loadStats(); }, 60000);
+async function loadStats() {
+  const r = await api(`/api/stats?days=${stDays}`, undefined, "GET").catch(() => null); if (!r) return;
+  const T = r.totals, s = r.series;
+  $("#stRange").textContent = `${s[0].date} ~ ${s[s.length - 1].date} · ${stDays === 1 ? "오늘" : `최근 ${stDays}일`}`;
+  const k = (label, val, unit, sub = "") => `<div class="kpi"><span>${label}</span><b>${val}</b><small>${unit}</small>${sub ? `<em>${sub}</em>` : ""}</div>`;
+  $("#stKpis").innerHTML = [
+    k("총 작업 횟수", T.cycles, "회", `가동한 날 ${T.active_days}일`),
+    k("하루 평균 작업량", fx(T.avg_per_day, 1), "회/일", `가동일 기준 ${fx(T.avg_per_active_day, 1)}회`),
+    k("평균 사이클 시간", T.avg_cycle_s == null ? "—" : fx(T.avg_cycle_s, 1), "초", "작업 1회 걸린 시간"),
+    k("사고 건수", T.incidents, "건", T.top_incident ? `최다: ${esc(EVENT_LABEL[T.top_incident] || T.top_incident)}` : "사고 없음"),
+    k("작업 100회당 사고", T.incidents_per_100 == null ? "—" : fx(T.incidents_per_100, 1), "건", T.cycles_per_incident ? `사고 1건당 작업 ${fx(T.cycles_per_incident, 1)}회` : ""),
+    k("하루 평균 사고", fx(T.incidents / stDays, 1), "건/일", ""),
+  ].join("");
+  drawBars($("#stDaily"), s.map((d) => ({ x: d.date.slice(5).replace("-", "/"), v: d.cycles,
+    tip: `${d.date} · ${d.cycles}회${d.avg_cycle_s ? ` · 평균 ${fx(d.avg_cycle_s, 1)}초` : ""}` })), { avg: T.avg_per_day, color: "#1f4f8f", unit: "회" });
+  drawBars($("#stHour"), r.by_hour.map((v, h) => ({ x: h % 3 === 0 ? String(h) : "", v, tip: `${h}시 · ${v}회` })), { color: "#3b82f6", unit: "회", W: 380, H: 220 });
+  drawDonutInto($("#stDonut"), $("#stLegend"), r.incidents, T.incidents, stDays === 1 ? "오늘" : `최근 ${stDays}일`);
+  const rows = Object.entries(r.rate).slice(0, 12), mx = Math.max(1, ...rows.map(([, v]) => v.n));
+  $("#stRate").innerHTML = rows.length ? `<table><thead><tr><th>이벤트</th><th class="bcol"></th><th>건수</th><th>하루 평균</th><th>100회당</th></tr></thead><tbody>` +
+    rows.map(([t, v]) => { const inc = INC_COLOR[t];
+      return `<tr class="${inc ? "inc" : ""}"><td>${inc ? `<i style="background:${inc}"></i>` : "<i></i>"}${esc(EVENT_LABEL[t] || t)}</td>` +
+        `<td class="bcol"><div class="rbar"><span style="width:${(100 * v.n / mx).toFixed(1)}%;${inc ? `background:${inc}` : ""}"></span></div></td>` +
+        `<td class="num">${v.n}</td><td class="num">${fx(v.per_day, 1)}</td><td class="num">${v.per_100 == null ? "—" : fx(v.per_100, 1)}</td></tr>`; }).join("") +
+    `</tbody></table><p class="hint">색 있는 줄 = 사고 종류, 회색 = 운영 기록(재가동·작업 시작 등).</p>`
+    : `<div class="chart-empty">이 기간에 이벤트가 없습니다</div>`;
+  const types = Object.keys(r.incidents).sort((a, b) => r.incidents[b] - r.incidents[a]);
+  drawStacked($("#stInc"), s.map((d) => ({ x: d.date.slice(5).replace("-", "/"), parts: d.incidents, tip: d.date })), types);
+  $("#stIncLegend").innerHTML = types.map((t) => `<span><i class="lg" style="background:${INC_COLOR[t] || "#64748b"}"></i>${esc(EVENT_LABEL[t] || t)}</span>`).join("");
+}
+
+// 막대 차트 (단일 계열): items [{x, v, tip}], opt {avg, color, unit}
+function drawBars(el, items, opt = {}) {
+  if (!el) return;
+  const W = opt.W || 600, H = opt.H || 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
+  const top = Math.max(1, ...items.map((d) => d.v), opt.avg || 0) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top), bw = (W - L - R) / n;
+  const step = niceStep(top);
+  let s = "";
+  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 5}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
+  items.forEach((d, i) => {
+    const x = L + i * bw + bw * 0.16, w = bw * 0.68, y = Y(d.v);
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${Math.max(0, H - B - y)}" rx="2" fill="${opt.color || "#1f4f8f"}"><title>${esc(d.tip || "")}</title></rect>`;
+    if (d.v && n <= 31) s += `<text x="${x + w / 2}" y="${y - 3}" class="tick">${d.v}</text>`;
+    if (d.x && (n <= 14 || i % Math.ceil(n / 14) === 0)) s += `<text x="${x + w / 2}" y="${H - 8}" class="tick">${d.x}</text>`;
+  });
+  if (opt.avg) s += `<line x1="${L}" y1="${Y(opt.avg)}" x2="${W - R}" y2="${Y(opt.avg)}" stroke="#16803c" stroke-width="1.5" stroke-dasharray="5 4"/>` +
+    `<text x="${L + 6}" y="${Y(opt.avg) - 5}" class="tick start avg" fill="#16803c">평균 ${fx(opt.avg, 1)}${opt.unit || ""}</text>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${s}</svg>`;
+}
+// 누적 막대 (일별 사고 종류)
+function drawStacked(el, items, types) {
+  if (!el) return;
+  const W = 900, H = 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
+  const tot = items.map((d) => Object.values(d.parts).reduce((a, b) => a + b, 0));
+  if (!tot.some((v) => v)) { el.innerHTML = `<div class="chart-empty">이 기간에 사고가 없습니다</div>`; return; }
+  const top = Math.max(1, ...tot) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top), bw = (W - L - R) / n, step = niceStep(top);
+  let s = "";
+  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 5}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
+  items.forEach((d, i) => {
+    const x = L + i * bw + bw * 0.18, w = bw * 0.64;
+    let acc = 0;
+    for (const t of types) {
+      const v = d.parts[t] || 0; if (!v) continue;
+      s += `<rect x="${x}" y="${Y(acc + v)}" width="${w}" height="${Y(acc) - Y(acc + v)}" fill="${INC_COLOR[t] || "#64748b"}"><title>${esc(d.tip)} · ${esc(EVENT_LABEL[t] || t)} ${v}건</title></rect>`;
+      acc += v;
+    }
+    if (acc && n <= 31) s += `<text x="${x + w / 2}" y="${Y(acc) - 3}" class="tick">${acc}</text>`;
+    if (n <= 14 || i % Math.ceil(n / 14) === 0) s += `<text x="${x + w / 2}" y="${H - 8}" class="tick">${d.x}</text>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${s}</svg>`;
+}
+function niceStep(top) { const raw = top / 4, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p; return Math.max(1, (m > 5 ? 10 : m > 2 ? 5 : m > 1 ? 2 : 1) * p); }
+
+// ------------------------------------------------------------------ 시각화 (SVG, 외부 라이브러리 없음)
+const VC = { stop: "#dc2626", slow: "#f59e0b", hold: "#fcd34d", clear: "#16a34a", arm: "#1e3a8a", grid: "#e3e8f0", text: "#5d6a80", ink: "#13213c" };
+
+// 거리 기준 막대: 정지(빨강) · 감속(주황) · 재가동 대기(노랑) · 여유(초록), 지금 가장 가까운 사람 위치 표시
+function drawGauge(el, th, d, zone, preview = false) {
+  if (!el || !th) return;
+  const bad = !(th.stop < th.slow && th.slow <= th.clear);
+  const max = Math.max(th.clear * 1.6, th.clear + 0.05), W = 400, x0 = 8, x1 = W - 8, X = (m) => x0 + (x1 - x0) * Math.min(1, Math.max(0, m / max));
+  const seg = (a, b, c, lbl, ink = "#fff") => `<rect x="${X(a)}" y="22" width="${Math.max(0, X(b) - X(a))}" height="14" fill="${c}"/>` +
+    (X(b) - X(a) > 34 ? `<text x="${(X(a) + X(b)) / 2}" y="32.5" class="seg" fill="${ink}">${lbl}</text>` : "");
+  const cid = `${el.id}Clip`;
+  const tick = (m, t) => `<line x1="${X(m)}" y1="20" x2="${X(m)}" y2="40" stroke="${VC.ink}" stroke-width="1"/><text x="${X(m)}" y="52" class="tick">${t}</text>`;
+  let mk = "";
+  if (d !== null && d !== undefined) {
+    const x = X(d), col = d < th.stop ? VC.stop : d < th.slow ? VC.slow : d <= th.clear ? "#b45309" : VC.clear;
+    mk = `<path d="M${x - 6},6 L${x + 6},6 L${x},17 Z" fill="${col}"/><line x1="${x}" y1="17" x2="${x}" y2="38" stroke="${col}" stroke-width="2.5"/>` +
+      `<text x="${Math.min(x1 - 30, Math.max(x0 + 30, x))}" y="4" class="val" fill="${col}">${d > max ? "> " : ""}${fx(d, 2)} m</text>`;
+  }
+  el.innerHTML = `<svg viewBox="0 -8 ${W} 64" preserveAspectRatio="xMidYMid meet" role="img" aria-label="거리 기준">
+    <defs><clipPath id="${cid}"><rect x="${x0}" y="22" width="${x1 - x0}" height="14" rx="7"/></clipPath></defs>
+    <rect x="${x0}" y="22" width="${x1 - x0}" height="14" rx="7" fill="${VC.grid}"/>
+    <g clip-path="url(#${cid})">${seg(0, th.stop, VC.stop, "정지")}${seg(th.stop, th.slow, VC.slow, "감속")}${seg(th.slow, th.clear, VC.hold, "대기", "#78350f")}${seg(th.clear, max, "#bbf7d0", "여유", "#166534")}</g>
+    ${tick(0, "0")}${tick(th.stop, th.stop)}${tick(th.slow, th.slow)}${tick(th.clear, th.clear)}<text x="${x1}" y="52" class="tick end">m</text>
+    ${mk}${d === null || d === undefined ? `<text x="${W / 2}" y="4" class="val muted">${preview ? "미리 보기" : "사람 없음"}</text>` : ""}</svg>` +
+    (bad ? `<div class="err small">정지 &lt; 감속 ≤ 재가동 허용 순서여야 합니다</div>` : "");
+}
+
+// 감시 구역 지도 (위에서 본 모습): 위 = 로봇 앞(+x), 왼쪽 = +y. 단위 cm.
+function drawZoneMap(el, m, th) {
+  if (!el || !m || !m.zone) return;
+  const z = m.zone, cm = (v) => v * 100;
+  const W = cm(z.y[1] - z.y[0]), H = cm(z.x[1] - z.x[0]);
+  const P = (p) => [cm(z.y[1] - p[1]), cm(z.x[1] - p[0])];       // 로봇 베이스 (x, y) → 화면
+  let g = "";
+  for (let v = Math.ceil(z.y[0] * 4) / 4; v <= z.y[1]; v += 0.25) { const [x] = P([0, v]); g += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" class="gl${Math.abs(v) < 1e-6 ? " axis" : ""}"/>`; }
+  for (let v = Math.ceil(z.x[0] * 4) / 4; v <= z.x[1]; v += 0.25) { const [, y] = P([v, 0]); g += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" class="gl${Math.abs(v) < 1e-6 ? " axis" : ""}"/>`; }
+  let arm = "", ppl = "";
+  const links = m.links;
+  if (links && links.length > 1) {
+    const pts = links.map(P).map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    arm = `<polyline points="${pts}" class="band" stroke="${VC.slow}" stroke-width="${cm(th.slow) * 2}"/>` +
+      `<polyline points="${pts}" class="band" stroke="${VC.stop}" stroke-width="${cm(th.stop) * 2}"/>` +
+      `<polyline points="${pts}" class="arm"/>`;
+    const tcp = P(links[links.length - 1]);
+    arm += `<circle cx="${tcp[0]}" cy="${tcp[1]}" r="2.2" fill="#a21caf"/>`;
+  }
+  const [bx, by] = P([0, 0]);
+  arm += `<rect x="${bx - 4}" y="${by - 4}" width="8" height="8" rx="2" fill="${VC.arm}"/>`;
+  for (const p of (m.persons || [])) {
+    if (!p.pos) continue;
+    const [x, y] = P(p.pos), d = p.dist;
+    const col = d === null ? VC.text : d < th.stop ? VC.stop : d < th.slow ? VC.slow : VC.clear;
+    ppl += `<g><circle cx="${x}" cy="${y}" r="3.2" fill="${p.fallen ? "#fff" : col}" stroke="${col}" stroke-width="${p.fallen ? 1.6 : 1}"/>` +
+      `<text x="${x}" y="${y - 5}" class="plbl" fill="${col}">${p.fallen ? "넘어짐 " : ""}${d === null ? "?" : fx(d, 2) + "m"}</text></g>`;
+  }
+  const note = !links ? `<text x="${W / 2}" y="${H / 2}" class="note">카메라-로봇 보정 후 표시됩니다</text>` : "";
+  el.innerHTML = `<svg viewBox="-2 -2 ${W + 4} ${H + 4}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="감시 구역 지도">
+    <rect x="0" y="0" width="${W}" height="${H}" rx="3" class="zone"/>${g}${arm}${ppl}${note}
+    <text x="${W - 2}" y="${H - 2}" class="scale">칸 25 cm</text><text x="${bx}" y="${by + 11}" class="scale mid">로봇</text></svg>`;
+}
+
+// 컨베이어 이동 시간 차트: 최근 도착까지 걸린 시간 막대 + 제한시간 선 + 지금 가동 중이면 진행 막대
+function drawConvChart(el, cv) {
+  if (!el) return;
+  const h = cv.history || [], to = cv.timeout || 0, live = cv.timing && cv.running_for != null ? cv.running_for : null;
+  if (!h.length && live === null) {
+    el.innerHTML = `<div class="chart-empty">아직 기록이 없습니다 — 물품이 도착 센서에 닿을 때마다 걸린 시간이 쌓입니다</div>`;
+    return;
+  }
+  const W = 400, H = 150, L = 30, R = 8, T = 10, B = 22;
+  const vals = h.map((r) => r.s).concat(live !== null ? [live] : []);
+  const top = Math.max(to || 0, ...vals, 1) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top);
+  const n = 20, bw = (W - L - R) / n;
+  let s = "";
+  const step = top > 30 ? 10 : top > 12 ? 5 : top > 6 ? 2 : 1;
+  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 4}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
+  const bars = h.slice(-(live !== null ? n - 1 : n));
+  bars.forEach((r, i) => {
+    const x = L + i * bw + bw * 0.18, w = bw * 0.64, y = Y(r.s);
+    const tm = new Date(r.t * 1000).toTimeString().slice(0, 8);
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${H - B - y}" rx="2" fill="${r.jam ? VC.stop : "#3a5bef"}"><title>${tm} · ${r.jam ? "이상 (도착 안 함)" : fx(r.s, 1) + "초"}</title></rect>`;
+  });
+  if (live !== null) {
+    const i = bars.length, x = L + i * bw + bw * 0.18, w = bw * 0.64, y = Y(live);
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${H - B - y}" rx="2" fill="#93c5fd" class="pulse"><title>지금 가동 중 ${fx(live, 1)}초</title></rect>`;
+  }
+  if (to > 0) s += `<line x1="${L}" y1="${Y(to)}" x2="${W - R}" y2="${Y(to)}" stroke="${VC.stop}" stroke-dasharray="5 4" stroke-width="1.5"/><text x="${W - R}" y="${Y(to) - 4}" class="tick end" fill="${VC.stop}">제한 ${to}초</text>`;
+  const ok = h.filter((r) => !r.jam).map((r) => r.s), avg = ok.length ? ok.reduce((a, b) => a + b, 0) / ok.length : null;
+  if (avg !== null) s += `<line x1="${L}" y1="${Y(avg)}" x2="${W - R}" y2="${Y(avg)}" stroke="${VC.clear}" stroke-width="1.2"/><text x="${W - R - 60}" y="${Y(avg) - 4}" class="tick end" fill="${VC.clear}">평균 ${fx(avg, 1)}초</text>`;
+  s += `<text x="${L}" y="${H - 6}" class="tick">오래전</text><text x="${W - R}" y="${H - 6}" class="tick end">최근</text><text x="4" y="${T + 2}" class="tick">초</text>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="컨베이어 도착 시간">${s}</svg>`;
+}

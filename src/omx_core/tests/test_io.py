@@ -192,6 +192,7 @@ cj.step(200.0)
 vj.set_virtual(sensor1=False)
 cj.step(216.0)
 check(sj.conveyor_alarm and not vj.conveyor_on(), "15초 넘게 도착 안 함 → 이상")
+check(cj.history and cj.history[-1]["jam"] and cj.snapshot()["history"][-1]["s"] == 15.0, "차트 기록: 이상은 제한시간 막대(빨강)")
 check(rj.log == [("pause", "컨베이어 이상")] and rj.stopped == [], "이상이면 로봇 작업은 끝내지 않고 일시 정지")
 check(rj.pose == "place" and yaml.safe_load(open(Path(__file__).parent.parent / "config/default.yaml"))["conveyor"]["resume_pose"] == "place",
       "재개할 때 place 자세에서 물품 대기 (기본 설정 resume_pose: place)")

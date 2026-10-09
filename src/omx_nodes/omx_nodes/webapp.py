@@ -24,7 +24,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import omx.web as _web
-from omx.events import STORED
+from omx.events import EVENT_CATS, INCIDENTS, STATS_ONLY, STORED
+from omx.storage import stats as dash_stats
 EXTS = (".pt", ".engine", ".onnx")          # omx.perception.detector 와 같다 (웹 노드가 cv2·numpy 를 불러오지 않게)
 
 from .common import RemoteError, jsonable
@@ -135,6 +136,7 @@ def create_app(ctx):
             "door_roi": C["safety"].get("door_roi_px"),
             "safety_profiles": C["safety"]["profiles"],
             "vanish_grace": C["safety"]["vanish_grace"],
+            "map": {**(pc.get("persons") or {}), "zone": C["safety"]["zone_base"]},
             "sys": ctx.sysmon.snapshot(),
             "nodes": ctx.node_status(),
         }
@@ -566,15 +568,37 @@ def create_app(ctx):
 
     # ------------------------------------------------------------ 이벤트·영상
     @app.get("/api/events")
-    def events(limit: int = 50, before: int = None, user=Depends(require_user)):
-        return {"events": ctx.db.list(min(limit, 500), before, types=sorted(STORED))}
+    def events(limit: int = 50, before: int = None, cat: str = None, user=Depends(require_user)):
+        if cat and cat not in EVENT_CATS:
+            raise HTTPException(400, "분류는 " + ", ".join(EVENT_CATS))
+        types = EVENT_CATS[cat] if cat else sorted(STORED)
+        return {"events": ctx.db.list(min(limit, 500), before, types=types)}
 
-    CLIP_CATS = {"human": ["human_stop"], "conveyor": ["conveyor_jam"], "fire": ["fire"]}
+    @app.get("/api/events/summary")
+    def events_summary(days: float = 7, user=Depends(require_user)):
+        """대시보드: 기간 안 사고 종류별 수 + 이벤트 분류별 미확인 수."""
+        since = time.time() - max(0.0, min(days, 3650)) * 86400 if days > 0 else None
+        inc = ctx.db.type_counts(INCIDENTS, since)
+        allc = ctx.db.type_counts(sorted(STORED))
+        return {"days": days, "by_type": {t: v["n"] for t, v in inc.items()},
+                "total": sum(v["n"] for v in inc.values()),
+                "cat_unacked": {c: sum(allc.get(t, {}).get("unacked", 0) for t in ts) for c, ts in EVENT_CATS.items()}}
+
+    @app.get("/api/stats")
+    def stats(days: int = 7, user=Depends(require_user)):
+        """통계 화면: 일별 작업량·평균 사이클 시간·시간대별 작업량·이벤트 발생률 (오늘 포함 days 일)."""
+        days = max(1, min(int(days), 365))
+        lt = time.localtime()
+        since = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1)) - 86400 * (days - 1)
+        rows = ctx.db.rows_since(sorted(STORED | STATS_ONLY), since)
+        return dash_stats.compute(rows, days)
+
+    CLIP_CATS = {"human": ["human_stop"], "vanish": ["vanish"], "fall": ["person_fall"], "conveyor": ["conveyor_jam"], "fire": ["fire"]}
 
     @app.get("/api/clips")
     def clips(cat: str = "human", limit: int = 60, before: int = None, day: str = None, user=Depends(require_user)):
         if cat not in (*CLIP_CATS, "other"):
-            raise HTTPException(400, "분류는 human, conveyor, fire, other")
+            raise HTTPException(400, "분류는 " + ", ".join((*CLIP_CATS, "other")))
         t_range = None
         if day:
             try:
