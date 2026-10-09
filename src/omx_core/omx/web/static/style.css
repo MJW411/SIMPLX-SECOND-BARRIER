@@ -317,3 +317,33 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .toast { box-shadow: 0 10px 30px rgba(15,23,42,.12); }
 .row-item:hover, .tile:hover { border-color: #b9c3d3; }
 ::selection { background: #c7d2fe; }
+
+/* ---------- 시각화 (거리 막대 · 감시 구역 지도 · 컨베이어 차트) ---------- */
+.viz svg { display: block; width: 100%; height: auto; overflow: visible; font-family: inherit;
+  fill: var(--text); stroke: none; stroke-width: 1; stroke-linecap: butt; stroke-linejoin: miter; }   /* 아이콘용 svg 기본값을 쓰지 않음 */
+.viz.gauge { margin: 14px 0 4px; }
+.viz .seg { font-size: 9px; font-weight: 700; text-anchor: middle; }
+.viz .tick { font-size: 11px; fill: var(--muted); text-anchor: middle; font-variant-numeric: tabular-nums; }
+.viz .tick.end { text-anchor: end; }
+.viz .val { font-size: 13px; font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.viz .val.muted { fill: var(--faint); font-weight: 600; }
+.viz.map { background: var(--sunk); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+.viz.map svg { max-height: 360px; }
+.viz .zone { fill: #fff; stroke: var(--line-2); stroke-width: .6; }
+.viz .map-gl, .viz .gl { stroke-width: .4; } .viz .gl.axis { stroke: #c3cbda; stroke-dasharray: 2 2; }
+.viz .band { fill: none; stroke-linecap: round; stroke-linejoin: round; opacity: .22; }
+.viz .arm { fill: none; stroke: #1e3a8a; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.viz .plbl { font-size: 5px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: #fff; stroke-width: 1.4px; }
+.viz .note { font-size: 6px; fill: var(--muted); text-anchor: middle; }
+.viz .scale { font-size: 4.2px; fill: var(--faint); text-anchor: end; } .viz .scale.mid { text-anchor: middle; fill: var(--muted); font-weight: 700; }
+.viz.chart { margin: 4px 0 6px; }
+.viz .gl { stroke: var(--line); }
+.viz.chart .gl { stroke-width: 1; }
+.viz .pulse { animation: vizPulse 1.2s ease-in-out infinite alternate; }
+@keyframes vizPulse { from { opacity: .45; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .viz .pulse { animation: none; } }
+.chart-empty { color: var(--muted); font-size: 12.5px; text-align: center; padding: 22px 10px; border: 1px dashed var(--line-2); border-radius: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.legend .lg { display: inline-block; width: 12px; height: 8px; border-radius: 3px; margin-right: 5px; vertical-align: 0; }
+.lg.stop { background: rgba(220,38,38,.35); } .lg.slow { background: rgba(245,158,11,.35); }
+.lg.arm { background: #1e3a8a; height: 3px; vertical-align: 2px; } .lg.person { background: #16a34a; width: 8px; border-radius: 50%; }

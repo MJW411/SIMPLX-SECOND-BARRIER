@@ -71,6 +71,13 @@
         <div class="stack">
           <div class="card pad0"><div class="cam-slot" data-cam="overview"></div></div>
           <div class="kpis" id="kpis"></div>
+          <div class="card">
+            <div class="card-h"><h3>감시 구역 지도</h3><span class="muted small">위에서 본 모습 · 로봇 베이스 기준</span></div>
+            <div id="zoneMap" class="viz map"></div>
+            <div class="legend"><span><i class="lg stop"></i>정지 거리</span><span><i class="lg slow"></i>감속 거리</span>
+              <span><i class="lg arm"></i>로봇 팔</span><span><i class="lg person"></i>사람(피규어)</span></div>
+            <p class="hint">팔 둘레의 색 띠는 위에서 본 근사입니다. 실제 판단은 높이까지 포함한 3D 거리로 합니다.</p>
+          </div>
         </div>
         <div class="stack">
           <div class="card">
@@ -85,6 +92,7 @@
               <button class="btn toggle" data-teachmode>티칭 모드</button>
               <button class="btn danger hidden" id="btnFireEnd">화재 상황 종료</button>
             </div>
+            <div id="distGauge" class="viz gauge"></div>
             <dl class="kv" id="safetyKv"></dl>
           </div>
           <div class="card">
@@ -302,7 +310,8 @@
             <dl class="kv" id="devKv"></dl>
           </div>
           <div class="card">
-            <div class="card-h"><h3>컨베이어 감시</h3></div>
+            <div class="card-h"><h3>컨베이어 감시</h3><span id="convTag" class="tag"></span></div>
+            <div id="convChart" class="viz chart"></div>
             <dl class="kv" id="convKv"></dl>
             <div class="btn-row"><button class="btn ghost" id="btnConvClear">컨베이어 이상 해제</button></div>
           </div>
@@ -385,6 +394,7 @@
             <div class="seg" id="profSeg"><button data-p="figure">피규어 시연</button><button data-p="human">실제 사람</button></div>
             <p class="hint">누른 기준이 바로 적용됩니다. 아래 값은 <b>지금 적용 중인 기준</b>의 값이며, 저장하면 즉시 반영됩니다.</p>
             <div class="thr-now" id="thrNow"></div>
+            <div id="thrGauge" class="viz gauge"></div>
             <div class="form-grid">
               <label class="field"><span>감속 거리 (m)</span><input type="number" id="thrSlow" step="0.01"></label>
               <label class="field"><span>정지 거리 (m)</span><input type="number" id="thrStop" step="0.01"></label>

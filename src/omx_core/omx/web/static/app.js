@@ -181,6 +181,8 @@ function render() {
   $("#btnRestart").disabled = !sf.stop_latched;
   $("#topRestart").classList.toggle("hidden", !sf.stop_latched || sf.fire);
   $("#btnFireEnd").classList.toggle("hidden", !sf.fire);
+  drawGauge($("#distGauge"), sf.thresholds, sf.min_dist, sf.zone);
+  if (page === "overview") drawZoneMap($("#zoneMap"), S.map, sf.thresholds);
   kv("#safetyKv", {
     "구역 판정": { CLEAR: "여유", SLOW: "감속 구역", STOP: "정지 구역" }[sf.zone] || sf.zone,
     "사라짐": `미확인 ${sf.vanish_unresolved}건 · 판정 대기 ${sf.vanish_pending}건`,
@@ -278,6 +280,8 @@ function render() {
     : { "판정": "헬멧 게이트가 꺼져 있습니다 (모노 카메라 또는 모델 없음)" });
   setIfIdle("#doorClose", st.close_sec);
   const cv = S.conveyor;
+  drawConvChart($("#convChart"), cv);
+  tag("#convTag", sf.conveyor_alarm ? "이상" : cv.timing ? "가동 중" : "멈춤", sf.conveyor_alarm ? "bad" : cv.timing ? "info" : "");
   kv("#convKv", { "제한시간": `${cv.timeout}초`, "측정": cv.timing ? "컨베이어 가동, 도착 센서 기다리는 중…" : "—",
     "최근 도착까지": cv.last_travel ? `${fx(cv.last_travel, 2)}초` : "—", "이상": esc(sf.conveyor_alarm || "없음"), "주의": esc(cv.warning || "없음") });
   $("#roiInfo").textContent = S.door_roi ? `[${S.door_roi.join(", ")}]` : "지정 안 됨";
@@ -288,6 +292,7 @@ function render() {
   $("#thrNow").innerHTML = `<b>${sf.profile === "figure" ? "피규어 시연" : "실제 사람"}</b> 적용 중 — 감속 ${sf.thresholds.slow} m · ` +
     `정지 ${sf.thresholds.stop} m · 재가동 허용 ${sf.thresholds.clear} m`;
   setIfIdle("#guardM", sf.guard_person_m);
+  thrPreview();
   tag("#calTag", !cal.calibrated ? "보정 전" : cal.valid === false ? "보정 틀어짐" : "보정 완료", cal.calibrated && cal.valid !== false ? "ok" : "warn");
   kv("#calKv", {
     "수동 보정 점": `${cal.samples}개`,
@@ -572,6 +577,13 @@ setInterval(() => {
 on("#btnConvClear", () => api("/api/safety/conveyor_clear"));
 
 // settings
+function thrPreview() {                         // 입력칸 값으로 거리 기준 막대 미리 보기 (저장 전에도)
+  const v = (id) => parseFloat($(id).value);
+  const th = { stop: v("#thrStop"), slow: v("#thrSlow"), clear: v("#thrClear") };
+  if ([th.stop, th.slow, th.clear].every(Number.isFinite)) drawGauge($("#thrGauge"), th, S?.safety?.min_dist ?? null, null, true);
+}
+["#thrStop", "#thrSlow", "#thrClear"].forEach((id) => $(id).addEventListener("input", thrPreview));
+
 function fillThr() {
   const p = S?.safety_profiles?.[thrShown]; if (!p) return;
   $("#thrSlow").value = p.slow; $("#thrStop").value = p.stop; $("#thrClear").value = p.clear; $("#vanGrace").value = S.vanish_grace;
@@ -814,3 +826,97 @@ on("#btnCalDelete", async () => {
 // ---------------------------------------------------------------- PWA
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 boot();
+
+
+// ------------------------------------------------------------------ 시각화 (SVG, 외부 라이브러리 없음)
+const VC = { stop: "#dc2626", slow: "#f59e0b", hold: "#fcd34d", clear: "#16a34a", arm: "#1e3a8a", grid: "#e3e8f0", text: "#5d6a80", ink: "#13213c" };
+
+// 거리 기준 막대: 정지(빨강) · 감속(주황) · 재가동 대기(노랑) · 여유(초록), 지금 가장 가까운 사람 위치 표시
+function drawGauge(el, th, d, zone, preview = false) {
+  if (!el || !th) return;
+  const bad = !(th.stop < th.slow && th.slow <= th.clear);
+  const max = Math.max(th.clear * 1.6, th.clear + 0.05), W = 400, x0 = 8, x1 = W - 8, X = (m) => x0 + (x1 - x0) * Math.min(1, Math.max(0, m / max));
+  const seg = (a, b, c, lbl, ink = "#fff") => `<rect x="${X(a)}" y="22" width="${Math.max(0, X(b) - X(a))}" height="14" fill="${c}"/>` +
+    (X(b) - X(a) > 34 ? `<text x="${(X(a) + X(b)) / 2}" y="32.5" class="seg" fill="${ink}">${lbl}</text>` : "");
+  const cid = `${el.id}Clip`;
+  const tick = (m, t) => `<line x1="${X(m)}" y1="20" x2="${X(m)}" y2="40" stroke="${VC.ink}" stroke-width="1"/><text x="${X(m)}" y="52" class="tick">${t}</text>`;
+  let mk = "";
+  if (d !== null && d !== undefined) {
+    const x = X(d), col = d < th.stop ? VC.stop : d < th.slow ? VC.slow : d <= th.clear ? "#b45309" : VC.clear;
+    mk = `<path d="M${x - 6},6 L${x + 6},6 L${x},17 Z" fill="${col}"/><line x1="${x}" y1="17" x2="${x}" y2="38" stroke="${col}" stroke-width="2.5"/>` +
+      `<text x="${Math.min(x1 - 30, Math.max(x0 + 30, x))}" y="4" class="val" fill="${col}">${d > max ? "> " : ""}${fx(d, 2)} m</text>`;
+  }
+  el.innerHTML = `<svg viewBox="0 -8 ${W} 64" preserveAspectRatio="xMidYMid meet" role="img" aria-label="거리 기준">
+    <defs><clipPath id="${cid}"><rect x="${x0}" y="22" width="${x1 - x0}" height="14" rx="7"/></clipPath></defs>
+    <rect x="${x0}" y="22" width="${x1 - x0}" height="14" rx="7" fill="${VC.grid}"/>
+    <g clip-path="url(#${cid})">${seg(0, th.stop, VC.stop, "정지")}${seg(th.stop, th.slow, VC.slow, "감속")}${seg(th.slow, th.clear, VC.hold, "대기", "#78350f")}${seg(th.clear, max, "#bbf7d0", "여유", "#166534")}</g>
+    ${tick(0, "0")}${tick(th.stop, th.stop)}${tick(th.slow, th.slow)}${tick(th.clear, th.clear)}<text x="${x1}" y="52" class="tick end">m</text>
+    ${mk}${d === null || d === undefined ? `<text x="${W / 2}" y="4" class="val muted">${preview ? "미리 보기" : "사람 없음"}</text>` : ""}</svg>` +
+    (bad ? `<div class="err small">정지 &lt; 감속 ≤ 재가동 허용 순서여야 합니다</div>` : "");
+}
+
+// 감시 구역 지도 (위에서 본 모습): 위 = 로봇 앞(+x), 왼쪽 = +y. 단위 cm.
+function drawZoneMap(el, m, th) {
+  if (!el || !m || !m.zone) return;
+  const z = m.zone, cm = (v) => v * 100;
+  const W = cm(z.y[1] - z.y[0]), H = cm(z.x[1] - z.x[0]);
+  const P = (p) => [cm(z.y[1] - p[1]), cm(z.x[1] - p[0])];       // 로봇 베이스 (x, y) → 화면
+  let g = "";
+  for (let v = Math.ceil(z.y[0] * 4) / 4; v <= z.y[1]; v += 0.25) { const [x] = P([0, v]); g += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" class="gl${Math.abs(v) < 1e-6 ? " axis" : ""}"/>`; }
+  for (let v = Math.ceil(z.x[0] * 4) / 4; v <= z.x[1]; v += 0.25) { const [, y] = P([v, 0]); g += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" class="gl${Math.abs(v) < 1e-6 ? " axis" : ""}"/>`; }
+  let arm = "", ppl = "";
+  const links = m.links;
+  if (links && links.length > 1) {
+    const pts = links.map(P).map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    arm = `<polyline points="${pts}" class="band" stroke="${VC.slow}" stroke-width="${cm(th.slow) * 2}"/>` +
+      `<polyline points="${pts}" class="band" stroke="${VC.stop}" stroke-width="${cm(th.stop) * 2}"/>` +
+      `<polyline points="${pts}" class="arm"/>`;
+    const tcp = P(links[links.length - 1]);
+    arm += `<circle cx="${tcp[0]}" cy="${tcp[1]}" r="2.2" fill="#a21caf"/>`;
+  }
+  const [bx, by] = P([0, 0]);
+  arm += `<rect x="${bx - 4}" y="${by - 4}" width="8" height="8" rx="2" fill="${VC.arm}"/>`;
+  for (const p of (m.persons || [])) {
+    if (!p.pos) continue;
+    const [x, y] = P(p.pos), d = p.dist;
+    const col = d === null ? VC.text : d < th.stop ? VC.stop : d < th.slow ? VC.slow : VC.clear;
+    ppl += `<g><circle cx="${x}" cy="${y}" r="3.2" fill="${p.fallen ? "#fff" : col}" stroke="${col}" stroke-width="${p.fallen ? 1.6 : 1}"/>` +
+      `<text x="${x}" y="${y - 5}" class="plbl" fill="${col}">${p.fallen ? "넘어짐 " : ""}${d === null ? "?" : fx(d, 2) + "m"}</text></g>`;
+  }
+  const note = !links ? `<text x="${W / 2}" y="${H / 2}" class="note">카메라-로봇 보정 후 표시됩니다</text>` : "";
+  el.innerHTML = `<svg viewBox="-2 -2 ${W + 4} ${H + 4}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="감시 구역 지도">
+    <rect x="0" y="0" width="${W}" height="${H}" rx="3" class="zone"/>${g}${arm}${ppl}${note}
+    <text x="${W - 2}" y="${H - 2}" class="scale">칸 25 cm</text><text x="${bx}" y="${by + 11}" class="scale mid">로봇</text></svg>`;
+}
+
+// 컨베이어 이동 시간 차트: 최근 도착까지 걸린 시간 막대 + 제한시간 선 + 지금 가동 중이면 진행 막대
+function drawConvChart(el, cv) {
+  if (!el) return;
+  const h = cv.history || [], to = cv.timeout || 0, live = cv.timing && cv.running_for != null ? cv.running_for : null;
+  if (!h.length && live === null) {
+    el.innerHTML = `<div class="chart-empty">아직 기록이 없습니다 — 물품이 도착 센서에 닿을 때마다 걸린 시간이 쌓입니다</div>`;
+    return;
+  }
+  const W = 400, H = 150, L = 30, R = 8, T = 10, B = 22;
+  const vals = h.map((r) => r.s).concat(live !== null ? [live] : []);
+  const top = Math.max(to || 0, ...vals, 1) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top);
+  const n = 20, bw = (W - L - R) / n;
+  let s = "";
+  const step = top > 30 ? 10 : top > 12 ? 5 : top > 6 ? 2 : 1;
+  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 4}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
+  const bars = h.slice(-(live !== null ? n - 1 : n));
+  bars.forEach((r, i) => {
+    const x = L + i * bw + bw * 0.18, w = bw * 0.64, y = Y(r.s);
+    const tm = new Date(r.t * 1000).toTimeString().slice(0, 8);
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${H - B - y}" rx="2" fill="${r.jam ? VC.stop : "#3a5bef"}"><title>${tm} · ${r.jam ? "이상 (도착 안 함)" : fx(r.s, 1) + "초"}</title></rect>`;
+  });
+  if (live !== null) {
+    const i = bars.length, x = L + i * bw + bw * 0.18, w = bw * 0.64, y = Y(live);
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${H - B - y}" rx="2" fill="#93c5fd" class="pulse"><title>지금 가동 중 ${fx(live, 1)}초</title></rect>`;
+  }
+  if (to > 0) s += `<line x1="${L}" y1="${Y(to)}" x2="${W - R}" y2="${Y(to)}" stroke="${VC.stop}" stroke-dasharray="5 4" stroke-width="1.5"/><text x="${W - R}" y="${Y(to) - 4}" class="tick end" fill="${VC.stop}">제한 ${to}초</text>`;
+  const ok = h.filter((r) => !r.jam).map((r) => r.s), avg = ok.length ? ok.reduce((a, b) => a + b, 0) / ok.length : null;
+  if (avg !== null) s += `<line x1="${L}" y1="${Y(avg)}" x2="${W - R}" y2="${Y(avg)}" stroke="${VC.clear}" stroke-width="1.2"/><text x="${W - R - 60}" y="${Y(avg) - 4}" class="tick end" fill="${VC.clear}">평균 ${fx(avg, 1)}초</text>`;
+  s += `<text x="${L}" y="${H - 6}" class="tick">오래전</text><text x="${W - R}" y="${H - 6}" class="tick end">최근</text><text x="4" y="${T + 2}" class="tick">초</text>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="컨베이어 도착 시간">${s}</svg>`;
+}

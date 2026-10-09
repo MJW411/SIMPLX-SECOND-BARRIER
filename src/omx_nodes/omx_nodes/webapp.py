@@ -135,6 +135,7 @@ def create_app(ctx):
             "door_roi": C["safety"].get("door_roi_px"),
             "safety_profiles": C["safety"]["profiles"],
             "vanish_grace": C["safety"]["vanish_grace"],
+            "map": {**(pc.get("persons") or {}), "zone": C["safety"]["zone_base"]},
             "sys": ctx.sysmon.snapshot(),
             "nodes": ctx.node_status(),
         }

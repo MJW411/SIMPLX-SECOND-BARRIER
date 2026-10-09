@@ -224,6 +224,13 @@ class PerceptionNode(OmxNode):
             "persons": self._persons() if per.latest else {"persons": []},
         }
 
+    def _links(self):
+        """로봇 링크 관절점 (로봇 베이스 기준, 제어판 감시 구역 지도용). 보정 전이면 사람 위치가 카메라 기준이라 None."""
+        pts = self.ex.link_points()
+        if pts is None or self.calib.T_base_cam is None or not self.per.calib_valid:
+            return None
+        return [[round(float(v), 3) for v in p] for p in pts]
+
     def _persons(self):
         lat = self.per.latest
         if lat is None:
@@ -232,8 +239,10 @@ class PerceptionNode(OmxNode):
         return {"t": lat[1].t, "persons": [{"box": [round(v) for v in p.box], "conf": round(p.conf, 3),
                                             "dist": fin(p.dist), "cam_dist": fin(p.cam_dist), "npts": p.npts,
                                             "in_zone": p.in_zone, "name": p.name, "fallen": p.fallen,
-                                            "overlap": round(p.overlap, 2), "near": round(p.near, 2)}
+                                            "overlap": round(p.overlap, 2), "near": round(p.near, 2),
+                                            "pos": None if p.pos is None else [round(float(v), 3) for v in p.pos]}
                                            for p in lat[1].persons],
+                "links": self._links(),
                 "robot_rejects": getattr(self.per, "robot_rejects", 0)}
 
     def _config(self, section):

@@ -8,6 +8,7 @@
 import logging
 import threading
 import time
+from collections import deque
 
 import numpy as np
 
@@ -354,6 +355,7 @@ class ConveyorMonitor:
         self.on = False
         self.t_run = None
         self.last_travel = None
+        self.history = deque(maxlen=20)              # 최근 도착 기록 (제어판 차트): 걸린 시간, 이상 여부
         # 이 감시기가 건 이상 / 푼 시각 — 안전 노드 상태가 늦게 와도(노드 분리) 바로 반영되게
         self._jam = False
         self._jam_seen = False
@@ -414,6 +416,7 @@ class ConveyorMonitor:
         elif not want and self.on:
             if arrived:
                 self.last_travel = now - self.t_run
+                self.history.append({"t": round(time.time()), "s": round(self.last_travel, 2), "jam": False})
                 why = f"도착 센서 감지 ({self.last_travel:.1f}초)"
             else:
                 why = "화재" if fire else "작업 끝" if not working else "컨베이어 이상"
@@ -425,6 +428,7 @@ class ConveyorMonitor:
             self.t_run = None
             msg = f"컨베이어 이상 — {to:.0f}초 동안 돌았지만 도착 센서에 물품이 오지 않음, 컨베이어 정지"
             self._jam, self._jam_seen = True, False
+            self.history.append({"t": round(time.time()), "s": round(float(to), 2), "jam": True})
             self.safety.conveyor_alarm = msg
             self.events.emit("conveyor_jam", msg, level="alarm", clip=True)
             # 컨베이어가 비정상으로 멈추면 로봇 작업은 일시 정지 (2026-10-09 사용자: 해제되면 자동으로 이어서)
@@ -453,5 +457,6 @@ class ConveyorMonitor:
         self.events.emit("conveyor_clear", f"컨베이어 이상 자동 해제 — {why}", level="info")
 
     def snapshot(self):
-        return {"timing": self.on, "last_travel": self.last_travel,
+        return {"timing": self.on, "last_travel": self.last_travel, "history": list(self.history),
+                "running_for": round(time.monotonic() - self.t_run, 1) if self.on and self.t_run is not None else None,
                 "timeout": self.cfg["conveyor"]["travel_timeout"], "warning": self.warning()}
