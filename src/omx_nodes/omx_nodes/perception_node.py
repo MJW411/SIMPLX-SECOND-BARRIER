@@ -183,13 +183,19 @@ class PerceptionNode(OmxNode):
             if layer is not None:
                 img = cv2.addWeighted(layer, 0.35, img, 0.65, 0)
         pts = self.ex.link_points()
-        if pts is not None and self.calib.T_base_cam is not None and self.per.calib_valid:
-            uv = self.calib.project(pts[1:], self.cam.intr)
+        if pts is not None and self.calib.T_base_cam is not None and self.per.calib_valid and self.cam.intr is not None:
+            # 계산한 로봇 모습 전체(거리 판단·보정 일치율에 쓰는 모양)를 반투명 하늘색 + 테두리로 (2026-10-12 사용자:
+            # 관절 중심을 이은 가는 선은 ㄱ자 팔에서 몸통을 비껴 지나가 어긋나 보였다)
+            sil = self.per._fk_silhouette(img.shape, self.calib.T_base_cam, pts)
+            if sil.any():
+                tint = img.copy()
+                tint[sil] = (255, 230, 0)
+                img = cv2.addWeighted(tint, 0.30, img, 0.70, 0)
+                cs, _ = cv2.findContours(sil.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(img, cs, -1, (255, 230, 0), 2)
+            uv = self.calib.project(pts[-1:], self.cam.intr)
             if uv is not None:
-                uv = uv.astype(int)
-                for a, b in zip(uv[:-1], uv[1:]):
-                    cv2.line(img, tuple(a), tuple(b), (255, 255, 0), 3)
-                cv2.circle(img, tuple(uv[-1]), 5, (255, 0, 255), -1)
+                cv2.circle(img, tuple(uv.astype(int)[-1]), 5, (255, 0, 255), -1)      # 그리퍼 끝 (TCP)
         roi = C["safety"].get("door_roi_px")
         if roi:
             cv2.rectangle(img, (roi[0], roi[1]), (roi[2], roi[3]), (255, 200, 0), 2)
@@ -303,7 +309,7 @@ class PerceptionNode(OmxNode):
                                  "convert": det.convert_status},
             "model_select": model_select,
             "calib_sample": calib_sample,
-            "calib_auto": lambda a: self.autocalib.start(),
+            "calib_auto": lambda a: self.autocalib.start(a.get("work_yaws") or ()),
             "calib_solve": calib_solve,
             "calib_reset": lambda a: calib.reset(keep_T=True),
             "calib_delete": lambda a: calib.delete_result(),
