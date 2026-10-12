@@ -72,10 +72,15 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .reasons.alarm { color: var(--danger); font-weight: 700; }
 .clock { display: flex; flex-direction: column; align-items: flex-end; padding: 0 14px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
 .clock b { font: 700 20px/1.1 var(--mono); letter-spacing: .02em; } .clock span { font-size: 11.5px; color: var(--muted); }
-.estop { width: 70px; height: 70px; flex: none; border-radius: 50%; cursor: pointer; border: 5px solid #facc15;
-  background: radial-gradient(circle at 35% 30%, #f87171, #b91c1c 60%, #7f1d1d); color: #fff; font-weight: 900; font-size: 13px;
-  letter-spacing: .04em; box-shadow: 0 0 0 1px #a16207, 0 4px 12px rgba(127, 29, 29, .35); }
+/* 비상정지: 빨강 사각 + 손바닥 '멈춰' 아이콘 (2026-10-12 사용자 E안) */
+.estop { width: 92px; height: 72px; flex: none; border-radius: 10px; cursor: pointer; border: 3px solid #fecaca;
+  background: #dc2626; color: #fff; font-weight: 900; font-size: 14px; letter-spacing: .02em;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, .35); }
+.estop svg { width: 26px; height: 26px; }
+.estop:hover { background: #b91c1c; }
 .estop:active { transform: scale(.95); }
+.estop:focus-visible { outline: 3px solid #111827; outline-offset: 2px; }
 .top-restart { padding: 12px 18px; font-size: 15px; font-weight: 800; }
 
 /* 상태 줄: 장치별 현재 상태 (정상은 조용히, 이상만 색) */
@@ -505,7 +510,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .topbar { padding: 8px 12px; gap: 10px; }
   .state-cap, .clock { display: none; }
   .state { min-width: 0; font-size: 14px; padding: 8px 10px; }
-  .estop { width: 58px; height: 58px; font-size: 11px; }
+  .estop { width: 72px; height: 58px; font-size: 11.5px; } .estop svg { width: 20px; height: 20px; }
   .status-strip { position: static; display: flex; overflow-x: auto; }
   .sc { flex: 0 0 auto; min-width: 112px; }
   .content { padding: 12px 12px 90px; }
@@ -538,7 +543,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .reasons { font-size: 14px; }
   .clock b { font-size: 22px; }
   .clock span { font-size: 12.5px; }
-  .estop { font-size: 14.5px; }
+  .estop { font-size: 15px; }
   .top-restart { font-size: 16.5px; }
   .sc-l { font-size: 12px; }
   .sc b { font-size: 16.5px; }
