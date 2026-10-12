@@ -1052,7 +1052,8 @@ const VC = { stop: "#dc2626", slow: "#f59e0b", hold: "#fcd34d", clear: "#16a34a"
 function drawGauge(el, th, d, zone, preview = false) {
   if (!el || !th) return;
   const bad = !(th.stop < th.slow && th.slow <= th.clear);
-  const max = Math.max(th.clear * 1.6, th.clear + 0.05), W = 400, x0 = 8, x1 = W - 8, X = (m) => x0 + (x1 - x0) * Math.min(1, Math.max(0, m / max));
+  // 모니터링 안전 칸은 좌표 폭을 줄여 막대·글자를 더 크게 그린다 (2026-10-12 사용자: 그래프 크게)
+  const max = Math.max(th.clear * 1.6, th.clear + 0.05), W = el.id === "distGauge" ? 300 : 400, x0 = 8, x1 = W - 8, X = (m) => x0 + (x1 - x0) * Math.min(1, Math.max(0, m / max));
   const seg = (a, b, c, lbl, ink = "#fff") => `<rect x="${X(a)}" y="22" width="${Math.max(0, X(b) - X(a))}" height="14" fill="${c}"/>` +
     (X(b) - X(a) > 34 ? `<text x="${(X(a) + X(b)) / 2}" y="32.5" class="seg" fill="${ink}">${lbl}</text>` : "");
   const cid = `${el.id}Clip`;

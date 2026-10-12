@@ -199,17 +199,21 @@ input[type=file] { padding: 6px; }
 /* 오른쪽 열 높이 비율: 안전 1 : 입구 카메라·헬멧 1 (2026-10-12 사용자) */
 #page-overview > .grid-2 > .stack:last-child > .card:first-child { flex: 1 1 0; display: flex; flex-direction: column; }
 /* 칸 안 최적화: 안전 칸의 표가 남는 높이를 고르게 채우고, GATE 글자는 칸 폭에 맞춰 크기가 바뀐다 */
-#page-overview #safetyKv { flex: 1 1 auto; grid-auto-rows: 1fr; min-height: 0; }
+#page-overview #safetyKv { flex: none; font-size: 16.5px; grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr); }   /* 표는 2×2 로 작게, 글자는 조금 크게 */
+#page-overview #safetyKv dt { font-size: 15px; padding: 5px 12px; } #page-overview #safetyKv dd { padding: 5px 12px; }
+#page-overview #distGauge { flex: 1 1 0; min-height: 70px; margin: 8px 0; position: relative; }   /* 그래프가 남는 높이를 차지 (1:1 비율 유지) */
+#page-overview #distGauge svg { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; }
 #page-overview .ov-safety-btns { flex-wrap: nowrap; }
 #page-overview .ov-safety-btns .btn.big { flex: 1 1 auto; }
 #page-overview .ov-safety-btns .btn.toggle, #page-overview .ov-safety-btns .btn.danger { flex: none; align-self: stretch; }
-#page-overview #distGauge svg { max-height: 92px; }
 #page-overview #safetyKv dt, #page-overview #safetyKv dd { display: flex; align-items: center; }
 #page-overview .ov-helmet-side { container-type: inline-size; }
 #page-overview .gate-badge { padding: 8px 6px; }
 #page-overview .gate-badge b { font-size: clamp(16px, 11.5cqi, 30px); }
 #page-overview .gate-badge span { font-size: clamp(11px, 5.2cqi, 14px); }
-#page-overview .ov-helmet-side .kv { font-size: clamp(12.5px, 5.6cqi, 15.5px); }
+#page-overview .ov-helmet-side { grid-template-rows: auto minmax(0, 1fr); }   /* 판정 표는 내용만큼(작게), GATE 가 나머지 */
+#page-overview .ov-helmet-side .kv { grid-auto-rows: auto; font-size: clamp(13.5px, 6cqi, 16.5px); }
+#page-overview .ov-helmet-side .kv dt, #page-overview .ov-helmet-side .kv dd { padding: 6px 10px; }
 #page-overview > .grid-2 > .stack:last-child > .card:last-child { flex: 1 1 0; display: flex; flex-direction: column; }
 #page-overview > .grid-2 > .stack:last-child > .card:last-child > .ov-helmet { flex: 1 1 auto; }
 #page-overview .ov-helmet-cam { position: relative; height: 100%; }
