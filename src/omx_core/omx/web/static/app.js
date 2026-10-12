@@ -270,6 +270,9 @@ function render() {
   const st = S.site || {};
   const h = st.helmet;
   tag("#helmetTag", !h ? "꺼짐" : st.door_wanted ? "문 열림" : "닫힘", !h ? "" : st.door_wanted ? "ok" : "");
+  tag("#ovHelmetTag", !h ? "꺼짐" : st.door_wanted ? "문 열림" : "닫힘", !h ? "" : st.door_wanted ? "ok" : "");
+  kv("#ovHelmetKv", h ? { "판정": esc(h.state), "검출": h.detections.length ? esc(h.detections.map((x) => `${x.name} ${Math.round(x.conf * 100)}%`).join(", ")) : "—" }
+    : { "판정": "헬멧 게이트 꺼짐" });
   kv("#helmetKv", h ? { "판정": esc(h.state), "검출": h.detections.length ? esc(h.detections.map((x) => `${x.name} ${Math.round(x.conf * 100)}%`).join(", ")) : "—",
     "닫힐 때까지": st.door_wanted ? `${fx(Math.max(h.open_left, st.manual_left), 1)}초` : "—",
     "카메라": h.camera_error ? esc(h.camera_error) : `${h.camera_fps} fps · ${esc(h.model)} ${h.infer_ms} ms` }
@@ -560,10 +563,10 @@ $$(".tile[data-dev]").forEach((el) => el.addEventListener("click", () => {
 }));
 on("#btnDoorOpen", () => api("/api/devices/door_open").then(() => toast("출입문을 열었습니다", "ok")).catch(() => {}));
 on("#btnDoorClose", async () => { await api("/api/settings/door", { close_sec: +$("#doorClose").value }); toast("저장했습니다", "ok"); });
-// 입구 카메라: 입출력 화면을 보고 있을 때만 0.5초마다 한 장씩 받는다
+// 입구 카메라: 입출력·모니터링 화면을 보고 있을 때만 0.5초마다 한 장씩 받는다
 setInterval(() => {
-  if (page !== "io" || document.hidden || !S?.site?.helmet) return;
-  const img = $("#helmetImg");
+  if ((page !== "io" && page !== "overview") || document.hidden || !S?.site?.helmet) return;
+  const img = $(page === "io" ? "#helmetImg" : "#ovHelmetImg");
   if (img.dataset.busy) return;
   img.dataset.busy = "1";
   fetch("/api/helmet/frame.jpg", { cache: "no-store" }).then((r) => r.ok ? r.blob() : null).then((b) => {

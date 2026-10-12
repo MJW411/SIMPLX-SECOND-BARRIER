@@ -6,7 +6,7 @@
   --line: #d8dde5; --line-2: #c3cad5;
   --text: #17202e; --muted: #5a6577; --faint: #97a1b1;
   --accent: #1f4f8f; --accent-2: #173f74; --accent-soft: #e7eef8;
-  --nav: #0e1a2b; --nav-2: #172739; --nav-line: #22344b; --nav-text: #a9b6c9;
+  --nav: #0b3a8c; --nav-2: #134aa6; --nav-line: #2356a8; --nav-text: #dce7ff;
   --ok: #15803d; --ok-bg: #e6f4ea; --warn: #b45309; --warn-bg: #fff4dc; --danger: #c81e1e; --danger-bg: #fdecec;
   --info: #1d4ed8; --info-bg: #e8effc; --orange: #ea580c;
   --radius: 6px; --shadow: 0 1px 2px rgba(16, 24, 40, .06);
@@ -42,11 +42,11 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .brand span { display: block; font-size: 11px; color: var(--nav-text); letter-spacing: .06em; }
 .brand.big img { width: 42px; height: 42px; } .brand.big b { font-size: 18px; } .login-card .brand { border-bottom-color: var(--line); }
 .sidebar a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 4px; color: var(--nav-text);
-  cursor: pointer; user-select: none; position: relative; font-weight: 500; font-size: 13.5px; }
-.sidebar a svg { color: #6f7f97; }
+  cursor: pointer; user-select: none; position: relative; font-weight: 600; font-size: 15.5px; padding: 11px 12px; }
+.sidebar a svg { color: #a9c3f2; width: 20px; height: 20px; }
 .sidebar a:hover { background: var(--nav-2); color: #fff; } .sidebar a:hover svg { color: #c7d2e2; }
-.sidebar a.active { background: #1d3150; color: #fff; font-weight: 650; } .sidebar a.active svg { color: #7fb0ff; }
-.sidebar a.active::before { content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: #4c8dff; }
+.sidebar a.active { background: rgba(255,255,255,.18); color: #fff; font-weight: 700; } .sidebar a.active svg { color: #fff; }
+.sidebar a.active::before { content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: #ffffff; }
 .count { margin-left: auto; font-style: normal; background: var(--danger); color: #fff; border-radius: 3px; font-size: 11px; padding: 1px 6px; font-weight: 700; }
 .side-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; color: var(--nav-text); font-size: 12px; padding: 10px 8px 4px; border-top: 1px solid var(--nav-line); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #56657a; }
@@ -209,6 +209,11 @@ input[type=file] { padding: 6px; }
 .cam-hint { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); background: #fbbf24; color: #111;
   padding: 5px 12px; border-radius: 4px; font-weight: 700; z-index: 2; font-size: 13px; }
 .helmet-img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0b0f16; border-radius: 4px; margin-bottom: 10px; }
+/* 모니터링 · 안전 카드 안의 입구 카메라 (작게, 판정 옆에) */
+.ov-helmet { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 12px; align-items: start; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.ov-helmet-img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0b0f16; border-radius: 4px; }
+.ov-helmet-h { font-size: 12px; font-weight: 700; margin-bottom: 6px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 520px) { .ov-helmet { grid-template-columns: 1fr; } }
 
 /* ---------- jog ---------- */
 .jog { display: flex; flex-direction: column; gap: 8px; }
@@ -406,7 +411,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .sidebar { position: fixed; bottom: 0; top: auto; left: 0; right: 0; height: auto; flex-direction: row; padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
     border-right: 0; border-top: 1px solid var(--nav-line); z-index: 30; gap: 0; justify-content: space-around; }
   .sidebar .brand, .side-foot { display: none; }
-  .sidebar a { flex-direction: column; gap: 3px; padding: 6px 4px; font-size: 10.5px; flex: 1; text-align: center; }
+  .sidebar a { flex-direction: column; gap: 3px; padding: 6px 4px; font-size: 11.5px; flex: 1; text-align: center; }
   .sidebar a.active::before { display: none; }
   .count { position: absolute; top: 0; right: 18%; margin: 0; font-size: 10px; padding: 0 5px; }
   .topbar { padding: 8px 12px; gap: 10px; }
