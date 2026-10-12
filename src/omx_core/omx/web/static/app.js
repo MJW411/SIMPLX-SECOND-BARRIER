@@ -75,6 +75,7 @@ function start() {
 function go(p) {
   if (!$("#page-" + p)) p = "overview";
   page = p;
+  document.body.dataset.page = p;
   $$(".sidebar a").forEach((a) => a.classList.toggle("active", a.dataset.page === p));
   $$(".page").forEach((s) => s.classList.toggle("hidden", s.id !== "page-" + p));
   placeCamera();
@@ -897,6 +898,12 @@ $$("#stDays button").forEach((b) => b.addEventListener("click", () => {
 setInterval(() => { if (page === "stats") loadStats(); }, 60000);
 async function loadStats() {
   const r = await api(`/api/stats?days=${stDays}`, undefined, "GET").catch(() => null); if (!r) return;
+  stLast = r; renderStats(r);
+}
+// 통계 화면은 창 크기에 맞춰 꽉 채우므로 크기가 바뀌면 다시 그림
+let stLast = null, stResizeT = 0;
+window.addEventListener("resize", () => { clearTimeout(stResizeT); stResizeT = setTimeout(() => { if (page === "stats" && stLast) renderStats(stLast); }, 150); });
+function renderStats(r) {
   const T = r.totals, s = r.series;
   $("#stRange").textContent = `${s[0].date} ~ ${s[s.length - 1].date} · ${stDays === 1 ? "오늘" : `최근 ${stDays}일`}`;
   const k = (label, val, unit, sub = "") => `<div class="kpi"><span>${label}</span><b>${val}</b><small>${unit}</small>${sub ? `<em>${sub}</em>` : ""}</div>`;
@@ -909,8 +916,8 @@ async function loadStats() {
     k("하루 평균 사고", fx(T.incidents / stDays, 1), "건/일", ""),
   ].join("");
   drawBars($("#stDaily"), s.map((d) => ({ x: d.date.slice(5).replace("-", "/"), v: d.cycles,
-    tip: `${d.date} · ${d.cycles}회${d.avg_cycle_s ? ` · 평균 ${fx(d.avg_cycle_s, 1)}초` : ""}` })), { avg: T.avg_per_day, color: "#1f4f8f", unit: "회" });
-  drawBars($("#stHour"), r.by_hour.map((v, h) => ({ x: h % 3 === 0 ? String(h) : "", v, tip: `${h}시 · ${v}회` })), { color: "#3b82f6", unit: "회", W: 380, H: 220 });
+    tip: `${d.date} · ${d.cycles}회${d.avg_cycle_s ? ` · 평균 ${fx(d.avg_cycle_s, 1)}초` : ""}` })), { avg: T.avg_per_day, color: "#1f4f8f", unit: "회", fit: true });
+  drawBars($("#stHour"), r.by_hour.map((v, h) => ({ x: h % 3 === 0 ? String(h) : "", v, tip: `${h}시 · ${v}회` })), { color: "#3b82f6", unit: "회", W: 380, H: 220, fit: true });
   drawDonutInto($("#stDonut"), $("#stLegend"), r.incidents, T.incidents, stDays === 1 ? "오늘" : `최근 ${stDays}일`);
   const rows = Object.entries(r.rate).slice(0, 12), mx = Math.max(1, ...rows.map(([, v]) => v.n));
   $("#stRate").innerHTML = rows.length ? `<table><thead><tr><th>이벤트</th><th class="bcol"></th><th>건수</th><th>하루 평균</th><th>100회당</th></tr></thead><tbody>` +
@@ -920,15 +927,14 @@ async function loadStats() {
         `<td class="num">${v.n}</td><td class="num">${fx(v.per_day, 1)}</td><td class="num">${v.per_100 == null ? "—" : fx(v.per_100, 1)}</td></tr>`; }).join("") +
     `</tbody></table><p class="hint">색 있는 줄 = 사고 종류, 회색 = 운영 기록(재가동·작업 시작 등).</p>`
     : `<div class="chart-empty">이 기간에 이벤트가 없습니다</div>`;
-  const types = Object.keys(r.incidents).sort((a, b) => r.incidents[b] - r.incidents[a]);
-  drawStacked($("#stInc"), s.map((d) => ({ x: d.date.slice(5).replace("-", "/"), parts: d.incidents, tip: d.date })), types);
-  $("#stIncLegend").innerHTML = types.map((t) => `<span><i class="lg" style="background:${INC_COLOR[t] || "#64748b"}"></i>${esc(EVENT_LABEL[t] || t)}</span>`).join("");
 }
 
 // 막대 차트 (단일 계열): items [{x, v, tip}], opt {avg, color, unit}
 function drawBars(el, items, opt = {}) {
   if (!el) return;
-  const W = opt.W || 600, H = opt.H || 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
+  // fit: 칸 크기를 그대로 좌표로 써서 늘어나거나 글자가 커지지 않게 함
+  const fit = opt.fit && el.clientWidth > 120 && el.clientHeight > 80;
+  const W = fit ? el.clientWidth : opt.W || 600, H = fit ? el.clientHeight : opt.H || 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
   const top = Math.max(1, ...items.map((d) => d.v), opt.avg || 0) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top), bw = (W - L - R) / n;
   const step = niceStep(top);
   let s = "";
@@ -941,28 +947,6 @@ function drawBars(el, items, opt = {}) {
   });
   if (opt.avg) s += `<line x1="${L}" y1="${Y(opt.avg)}" x2="${W - R}" y2="${Y(opt.avg)}" stroke="#16803c" stroke-width="1.5" stroke-dasharray="5 4"/>` +
     `<text x="${L + 6}" y="${Y(opt.avg) - 5}" class="tick start avg" fill="#16803c">평균 ${fx(opt.avg, 1)}${opt.unit || ""}</text>`;
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${s}</svg>`;
-}
-// 누적 막대 (일별 사고 종류)
-function drawStacked(el, items, types) {
-  if (!el) return;
-  const W = 900, H = 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
-  const tot = items.map((d) => Object.values(d.parts).reduce((a, b) => a + b, 0));
-  if (!tot.some((v) => v)) { el.innerHTML = `<div class="chart-empty">이 기간에 사고가 없습니다</div>`; return; }
-  const top = Math.max(1, ...tot) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top), bw = (W - L - R) / n, step = niceStep(top);
-  let s = "";
-  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 5}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
-  items.forEach((d, i) => {
-    const x = L + i * bw + bw * 0.18, w = bw * 0.64;
-    let acc = 0;
-    for (const t of types) {
-      const v = d.parts[t] || 0; if (!v) continue;
-      s += `<rect x="${x}" y="${Y(acc + v)}" width="${w}" height="${Y(acc) - Y(acc + v)}" fill="${INC_COLOR[t] || "#64748b"}"><title>${esc(d.tip)} · ${esc(EVENT_LABEL[t] || t)} ${v}건</title></rect>`;
-      acc += v;
-    }
-    if (acc && n <= 31) s += `<text x="${x + w / 2}" y="${Y(acc) - 3}" class="tick">${acc}</text>`;
-    if (n <= 14 || i % Math.ceil(n / 14) === 0) s += `<text x="${x + w / 2}" y="${H - 8}" class="tick">${d.x}</text>`;
-  });
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${s}</svg>`;
 }
 function niceStep(top) { const raw = top / 4, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p; return Math.max(1, (m > 5 ? 10 : m > 2 ? 5 : m > 1 ? 2 : 1) * p); }

@@ -210,10 +210,6 @@ input[type=file] { padding: 6px; }
   padding: 5px 12px; border-radius: 4px; font-weight: 700; z-index: 2; font-size: 13px; }
 .helmet-img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0b0f16; border-radius: 4px; margin-bottom: 10px; }
 /* 모니터링 · 안전 카드 안의 입구 카메라 (작게, 판정 옆에) */
-.ov-helmet { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 12px; align-items: start; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
-.ov-helmet-img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0b0f16; border-radius: 4px; }
-.ov-helmet-h { font-size: 12px; font-weight: 700; margin-bottom: 6px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-@media (max-width: 520px) { .ov-helmet { grid-template-columns: 1fr; } }
 
 /* ---------- jog ---------- */
 .jog { display: flex; flex-direction: column; gap: 8px; }
@@ -341,6 +337,9 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .viz .tick.end { text-anchor: end; }
 .viz .val { font-size: 13px; font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .viz .val.muted { fill: var(--faint); font-weight: 600; }
+.ov-helmet { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.ov-helmet-img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0b0f16; border-radius: 4px; }
+@media (max-width: 520px) { .ov-helmet { grid-template-columns: 1fr; } }
 .viz.map { background: var(--sunk); border: 1px solid var(--line); border-radius: 4px; padding: 8px; }
 .viz.map svg { max-height: 360px; }
 .viz .zone { fill: #fff; stroke: var(--line-2); stroke-width: .6; }
@@ -398,6 +397,25 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .rbar { height: 10px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
 .rbar span { display: block; height: 100%; background: #9aa6b8; border-radius: 2px; }
 @media (max-width: 1280px) { .st-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .st-kpis .kpi:nth-child(n+4) { border-top: 1px solid var(--line); } .st-kpis .kpi:nth-child(3) { border-right: 0; } }
+/* 통계: 넓은 화면에서는 스크롤 없이 한 화면에 꽉 차게 (위 줄 = 일별 작업량·사고 유형, 아래 줄 = 이벤트 발생률·시간대별) */
+@media (min-width: 1101px) and (min-height: 640px) {
+  body[data-page="stats"] .app { height: 100vh; min-height: 0; }
+  body[data-page="stats"] .content { display: flex; flex-direction: column; min-height: 0; padding-bottom: 18px; }
+  body[data-page="stats"] #page-stats { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #page-stats .st-grid { flex: 1; min-height: 0; grid-template-rows: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+  #page-stats .st-grid > .card { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  #page-stats .viz.chart { flex: 1 1 0; min-height: 0; margin: 0; position: relative; }
+  #page-stats .viz.chart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #page-stats .viz.chart .tick { font-size: 12px; }
+  #page-stats .viz.chart .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; }
+  #page-stats #stRate { flex: 1 1 0; min-height: 0; overflow: auto; }
+  #page-stats .rate-table td { padding: 5px 8px; }
+  #page-stats .rate-table th { position: sticky; top: 0; z-index: 1; }
+  #page-stats .donut-col { flex: 1 1 0; min-height: 0; flex-direction: row; align-items: center; gap: 16px; }
+  #page-stats .donut-col .viz.donut { flex: 0 0 auto; width: min(170px, 38%); }
+  #page-stats .donut-col .viz.donut svg { max-width: 100%; }
+  #page-stats .donut-col .donut-legend { flex: 1; width: auto; max-height: 100%; overflow: auto; }
+}
 @media (max-width: 1100px) { .st-grid { grid-template-columns: 1fr; } .st-grid .span2, .st-grid .span3 { grid-column: auto; } .rate-table .bcol { display: none; } }
 
 .viz.chart text { paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }

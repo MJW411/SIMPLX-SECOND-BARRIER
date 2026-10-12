@@ -90,20 +90,13 @@
             </div>
             <div id="distGauge" class="viz gauge"></div>
             <dl class="kv" id="safetyKv"></dl>
-            <div class="ov-helmet">
-              <img id="ovHelmetImg" class="ov-helmet-img" alt="입구 카메라">
-              <div class="ov-helmet-info">
-                <div class="ov-helmet-h">입구 카메라 · 헬멧 <span id="ovHelmetTag" class="tag"></span></div>
-                <dl class="kv" id="ovHelmetKv"></dl>
-              </div>
-            </div>
           </div>
           <div class="card">
-            <div class="card-h"><h3>감시 구역 지도</h3><span class="muted small">위에서 본 모습 · 로봇 베이스 기준</span></div>
-            <div id="zoneMap" class="viz map"></div>
-            <div class="legend"><span><i class="lg stop"></i>정지 거리</span><span><i class="lg slow"></i>감속 거리</span>
-              <span><i class="lg arm"></i>로봇 팔</span><span><i class="lg person"></i>사람(피규어)</span></div>
-            <p class="hint">팔 둘레의 색 띠는 위에서 본 근사입니다. 실제 판단은 높이까지 포함한 3D 거리로 합니다.</p>
+            <div class="card-h"><h3>입구 카메라 · 헬멧</h3><span id="ovHelmetTag" class="tag"></span></div>
+            <div class="ov-helmet">
+              <img id="ovHelmetImg" class="ov-helmet-img" alt="입구 카메라">
+              <dl class="kv" id="ovHelmetKv"></dl>
+            </div>
           </div>
         </div>
       </div>
@@ -361,11 +354,6 @@
         <div class="card">
           <div class="card-h"><h3>시간대별 작업량</h3><span class="muted small">0~23시</span></div>
           <div id="stHour" class="viz chart"></div>
-        </div>
-        <div class="card span3">
-          <div class="card-h"><h3>일별 사고 추이</h3><span class="muted small">사고 종류별 누적</span></div>
-          <div id="stInc" class="viz chart"></div>
-          <div class="legend" id="stIncLegend"></div>
         </div>
       </div>
     </section>
