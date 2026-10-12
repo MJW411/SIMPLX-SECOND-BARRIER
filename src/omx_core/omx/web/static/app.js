@@ -187,6 +187,7 @@ function render() {
   $("#btnRestart").disabled = !sf.stop_latched;
   $("#topRestart").classList.toggle("hidden", !sf.stop_latched || sf.fire);
   $("#btnFireEnd").classList.toggle("hidden", !sf.fire);
+  $("#btnConvClear").disabled = !sf.conveyor_alarm;
   drawGauge($("#distGauge"), sf.thresholds, sf.min_dist, sf.zone);
   if (page === "overview") drawZoneMap($("#zoneMap"), S.map, sf.thresholds);
   kv("#safetyKv", {
@@ -253,22 +254,6 @@ function render() {
   kv("#cycleKv", { "진행 상황": esc(c.status), "완료 횟수": c.max_cycles ? `${c.cycles} / ${c.max_cycles}회` : `${c.cycles}회`,
     "경과 시간": c.running ? `${c.elapsed}초` : "—" });
 
-  // I/O
-  const d = S.devices;
-  tag("#devTag", d.backend === "virtual" ? "가상 장치" : d.backend, d.healthy ? "info" : "bad");
-  const map = { sensor1: d.sensor1, sensor2: d.sensor2, fire: d.fire, door: d.door_open, conveyor: d.conveyor_on };
-  $$(".tile").forEach((el) => {
-    const v = map[el.dataset.dev], k = el.dataset.dev;
-    el.classList.toggle("on", v);
-    el.querySelector("b").textContent = k === "door" ? (v ? "열림" : "닫힘") : k === "conveyor" ? (v ? "가동 중" : "멈춤") : (v ? "감지" : "없음");
-  });
-  const LAMP = { G: "백색 · 대기", B: "백색 · 작업 중", C: "초록 · 작업 완료", O: "주황 · 사람 감속", R: "빨강 · 사람 정지(재가동 전까지)", Y: "노란 물결 · 화재 대피 유도" };
-  const lc = S.site?.led || d.led || "G";
-  $("#lampTile b").innerHTML = `<i class="lamp-dot lamp-${lc}"></i>${LAMP[lc] || lc}`;
-  $("#devHint").textContent = d.backend === "virtual"
-    ? "가상 장치입니다. 누를 때마다 켜짐/꺼짐이 바뀝니다. 작업 중에는 도착 센서가 꺼져 있으면 컨베이어가 돌고, 켜면 멈춥니다. 화재를 켜면 출입문이 열리고 로봇이 홈으로 돌아갑니다."
-    : "아두이노 실제 장치입니다. 센서 값은 실제 센서(투입 D6·도착 D5)를 따릅니다. 작업 중 투입 센서에 물품이 올라오면 컨베이어가 돌고, 도착 센서가 감지하거나 작업이 끝나면 멈춥니다. 출입문을 누르면 닫힘 시간 동안 열립니다.";
-  kv("#devKv", { "통신": esc(d.health), ...(d.flame != null ? { "화염 센서 값": `${d.flame} (300 넘으면 불꽃 — 센서 보류 중이면 감지 꺼짐)` } : {}) });
   const st = S.site || {};
   const h = st.helmet;
   tag("#helmetTag", !h ? "꺼짐" : st.door_wanted ? "문 열림" : "닫힘", !h ? "" : st.door_wanted ? "ok" : "");
@@ -280,11 +265,6 @@ function render() {
     "카메라": h.camera_error ? esc(h.camera_error) : `${h.camera_fps} fps · ${esc(h.model)} ${h.infer_ms} ms` }
     : { "판정": "헬멧 게이트가 꺼져 있습니다 (모노 카메라 또는 모델 없음)" });
   setIfIdle("#doorClose", st.close_sec);
-  const cv = S.conveyor;
-  drawConvChart($("#convChart"), cv);
-  tag("#convTag", sf.conveyor_alarm ? "이상" : cv.timing ? "가동 중" : "멈춤", sf.conveyor_alarm ? "bad" : cv.timing ? "info" : "");
-  kv("#convKv", { "제한시간": `${cv.timeout}초`, "측정": cv.timing ? "컨베이어 가동, 도착 센서 기다리는 중…" : "—",
-    "최근 도착까지": cv.last_travel ? `${fx(cv.last_travel, 2)}초` : "—", "이상": esc(sf.conveyor_alarm || "없음"), "주의": esc(cv.warning || "없음") });
   $("#roiInfo").textContent = S.door_roi ? `[${S.door_roi.join(", ")}]` : "지정 안 됨";
 
   // settings
@@ -558,11 +538,6 @@ on("#btnFreedrive", async () => {
   if (want && !confirm("팔 관절의 힘이 빠져 팔이 처질 수 있습니다. 팔을 손으로 받친 뒤 확인을 누르세요.")) return;
   await api("/api/robot/freedrive", { on: want });
 });
-$$(".tile[data-dev]").forEach((el) => el.addEventListener("click", () => {
-  if (el.dataset.dev === "door") return api("/api/devices/door_open").catch(() => {});
-  if (S?.devices?.backend !== "virtual") return toast("실제 장치입니다 — 센서를 직접 가려 시험하세요");
-  api("/api/devices/virtual", { [el.dataset.dev]: !el.classList.contains("on") }).catch(() => {});
-}));
 on("#btnDoorOpen", () => api("/api/devices/door_open").then(() => toast("출입문을 열었습니다", "ok")).catch(() => {}));
 on("#btnDoorClose", async () => { await api("/api/settings/door", { close_sec: +$("#doorClose").value }); toast("저장했습니다", "ok"); });
 // 입구 카메라: 모니터링 화면을 보고 있을 때만 0.5초마다 한 장씩 받는다
@@ -1017,34 +992,3 @@ function drawZoneMap(el, m, th) {
     <text x="${W - 2}" y="${H - 2}" class="scale">칸 25 cm</text><text x="${bx}" y="${by + 11}" class="scale mid">로봇</text></svg>`;
 }
 
-// 컨베이어 이동 시간 차트: 최근 도착까지 걸린 시간 막대 + 제한시간 선 + 지금 가동 중이면 진행 막대
-function drawConvChart(el, cv) {
-  if (!el) return;
-  const h = cv.history || [], to = cv.timeout || 0, live = cv.timing && cv.running_for != null ? cv.running_for : null;
-  if (!h.length && live === null) {
-    el.innerHTML = `<div class="chart-empty">아직 기록이 없습니다 — 물품이 도착 센서에 닿을 때마다 걸린 시간이 쌓입니다</div>`;
-    return;
-  }
-  const W = 400, H = 150, L = 30, R = 8, T = 10, B = 22;
-  const vals = h.map((r) => r.s).concat(live !== null ? [live] : []);
-  const top = Math.max(to || 0, ...vals, 1) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top);
-  const n = 20, bw = (W - L - R) / n;
-  let s = "";
-  const step = top > 30 ? 10 : top > 12 ? 5 : top > 6 ? 2 : 1;
-  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 4}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
-  const bars = h.slice(-(live !== null ? n - 1 : n));
-  bars.forEach((r, i) => {
-    const x = L + i * bw + bw * 0.18, w = bw * 0.64, y = Y(r.s);
-    const tm = new Date(r.t * 1000).toTimeString().slice(0, 8);
-    s += `<rect x="${x}" y="${y}" width="${w}" height="${H - B - y}" rx="2" fill="${r.jam ? VC.stop : "#3a5bef"}"><title>${tm} · ${r.jam ? "이상 (도착 안 함)" : fx(r.s, 1) + "초"}</title></rect>`;
-  });
-  if (live !== null) {
-    const i = bars.length, x = L + i * bw + bw * 0.18, w = bw * 0.64, y = Y(live);
-    s += `<rect x="${x}" y="${y}" width="${w}" height="${H - B - y}" rx="2" fill="#93c5fd" class="pulse"><title>지금 가동 중 ${fx(live, 1)}초</title></rect>`;
-  }
-  if (to > 0) s += `<line x1="${L}" y1="${Y(to)}" x2="${W - R}" y2="${Y(to)}" stroke="${VC.stop}" stroke-dasharray="5 4" stroke-width="1.5"/><text x="${W - R}" y="${Y(to) - 4}" class="tick end" fill="${VC.stop}">제한 ${to}초</text>`;
-  const ok = h.filter((r) => !r.jam).map((r) => r.s), avg = ok.length ? ok.reduce((a, b) => a + b, 0) / ok.length : null;
-  if (avg !== null) s += `<line x1="${L}" y1="${Y(avg)}" x2="${W - R}" y2="${Y(avg)}" stroke="${VC.clear}" stroke-width="1.2"/><text x="${W - R - 60}" y="${Y(avg) - 4}" class="tick end" fill="${VC.clear}">평균 ${fx(avg, 1)}초</text>`;
-  s += `<text x="${L}" y="${H - 6}" class="tick">오래전</text><text x="${W - R}" y="${H - 6}" class="tick end">최근</text><text x="4" y="${T + 2}" class="tick">초</text>`;
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="컨베이어 도착 시간">${s}</svg>`;
-}

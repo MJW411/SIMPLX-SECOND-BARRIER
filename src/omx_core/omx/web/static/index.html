@@ -48,7 +48,6 @@
     <a data-page="stats"><svg><use href="#i-stats"/></svg><span>통계</span></a>
     <a data-page="robot"><svg><use href="#i-robot"/></svg><span>로봇·작업</span></a>
     <a data-page="teach"><svg><use href="#i-teach"/></svg><span>티칭</span></a>
-    <a data-page="io"><svg><use href="#i-io"/></svg><span>입출력</span></a>
     <a data-page="events"><svg><use href="#i-events"/></svg><span>이벤트</span><em id="unacked" class="count hidden"></em></a>
     <a data-page="videos"><svg><use href="#i-video"/></svg><span>영상</span><em id="vidUnacked" class="count hidden"></em></a>
     <a data-page="settings"><svg><use href="#i-settings"/></svg><span>설정</span></a>
@@ -85,6 +84,7 @@
             </div>
             <div class="btn-row">
               <button class="btn toggle" id="btnMaint">정비 모드</button>
+              <button class="btn" id="btnConvClear" title="컨베이어 이상(물품이 제때 도착하지 않음)을 확인했다고 표시하고 작업을 다시 이어 갑니다">컨베이어 이상 해제</button>
               <button class="btn danger hidden" id="btnFireEnd">화재 상황 종료</button>
             </div>
             <div id="distGauge" class="viz gauge"></div>
@@ -277,34 +277,6 @@
     </section>
 
 
-    <!-- ============ I/O ============ -->
-    <section class="page hidden" id="page-io">
-      <div class="grid-2">
-        <div class="stack">
-          <div class="card">
-            <div class="card-h"><h3>장치</h3><span id="devTag" class="tag"></span></div>
-            <div class="tiles">
-              <button class="tile" data-dev="sensor2"><span>도착 센서 (D5)</span><b>—</b></button>
-              <button class="tile fire" data-dev="fire"><span>화재</span><b>—</b></button>
-              <button class="tile" data-dev="door"><span>출입문</span><b>—</b></button>
-              <button class="tile" data-dev="conveyor"><span>컨베이어</span><b>—</b></button>
-              <div class="tile lamp" id="lampTile"><span>상태 불빛</span><b>—</b></div>
-            </div>
-            <p class="hint" id="devHint"></p>
-            <dl class="kv" id="devKv"></dl>
-          </div>
-          <div class="card">
-            <div class="card-h"><h3>컨베이어 감시</h3><span id="convTag" class="tag"></span></div>
-            <div id="convChart" class="viz chart"></div>
-            <dl class="kv" id="convKv"></dl>
-            <div class="btn-row"><button class="btn ghost" id="btnConvClear">컨베이어 이상 해제</button></div>
-          </div>
-        </div>
-        <div class="stack">
-          <div class="card pad0"><div class="cam-slot" data-cam="io"></div></div>
-        </div>
-      </div>
-    </section>
 
     <!-- ============ Stats (운영 통계 대시보드) ============ -->
     <section class="page hidden" id="page-stats">
