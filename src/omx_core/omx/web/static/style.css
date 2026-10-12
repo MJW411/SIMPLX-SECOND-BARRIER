@@ -185,7 +185,7 @@ input[type=file] { padding: 6px; }
 .kpi span { display: block; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .kpi b { font: 700 22px/1.3 var(--mono); color: var(--text); } .kpi small { color: var(--muted); margin-left: 4px; }
 .joints { display: flex; flex-direction: column; gap: 10px; }
-.joint { display: grid; grid-template-columns: 70px 72px 1fr 48px; align-items: center; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.joint { display: grid; grid-template-columns: 88px 72px 1fr 48px; align-items: center; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .joint .n { color: var(--muted); } .joint .v { text-align: right; font-family: var(--mono); }
 .bar { height: 8px; background: var(--panel-2); border-radius: 2px; overflow: hidden; border: 1px solid var(--line); }
 .bar i { display: block; height: 100%; background: var(--accent); }
@@ -337,7 +337,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .viz .tick.end { text-anchor: end; }
 .viz .val { font-size: 13px; font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .viz .val.muted { fill: var(--faint); font-weight: 600; }
-.ov-helmet { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.ov-helmet { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 .ov-helmet-cam { position: relative; min-width: 0; }
 .ov-helmet-cam::before { content: "CAM 02 · 입구"; }
 .ov-helmet-img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0b0f16; border-radius: 4px; }
@@ -370,6 +370,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .donut-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .donut-legend li { display: grid; grid-template-columns: 12px 1fr auto 42px; gap: 8px; align-items: center; padding: 6px 10px; font-size: 13px; border-bottom: 1px solid var(--line); }
 .donut-legend li:last-child { border-bottom: 0; }
+.donut-legend li > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .donut-legend li:first-child { background: var(--sunk); font-weight: 700; }
 .donut-legend i { width: 10px; height: 10px; border-radius: 2px; }
 .donut-legend b { font-family: var(--mono); } .donut-legend small { color: var(--muted); text-align: right; font-family: var(--mono); }
@@ -476,3 +477,79 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .top-restart { padding: 9px 10px; font-size: 13px; }
 }
 .teachmode-card:has(.on) { border-color: #f59e0b; }
+
+/* 넓은 화면(1600px 이상): 글자 약 10% 크게 — 좁은 화면은 줄내림이 생기지 않도록 기본 크기 유지 */
+@media (min-width: 1600px) {
+  html, body { font-size: 15.5px; }
+  .small { font-size: 14px; }
+  h3 { font-size: 15px; }
+  code { font-size: 13px; }
+  .brand b { font-size: 16.5px; }
+  .brand span { font-size: 12px; }
+  .brand.big b { font-size: 20px; }
+  .sidebar a { font-size: 17px; }
+  .count { font-size: 12px; }
+  .side-foot { font-size: 13px; }
+  .state-cap { font-size: 11.5px; }
+  .state { font-size: 20px; }
+  .top-line b { font-size: 17.5px; }
+  .reasons { font-size: 14px; }
+  .clock b { font-size: 22px; }
+  .clock span { font-size: 12.5px; }
+  .estop { font-size: 14.5px; }
+  .top-restart { font-size: 16.5px; }
+  .sc-l { font-size: 12px; }
+  .sc b { font-size: 16.5px; }
+  .sc small { font-size: 12px; }
+  .tag { font-size: 12.5px; }
+  .hint { font-size: 14px; }
+  .btn.big { font-size: 16.5px; }
+  .field { font-size: 13px; }
+  .slider b { font-size: 14.5px; }
+  .switch { font-size: 14.5px; }
+  .seg button { font-size: 14.5px; }
+  .kv { font-size: 14.5px; }
+  .kv dt { font-size: 14px; }
+  .latch { font-size: 14.5px; }
+  .row-item .meta { font-size: 13px; }
+  .row-item .btn { font-size: 14px; }
+  .pill-home { font-size: 12px; }
+  .kpi span { font-size: 12px; }
+  .kpi b { font-size: 24px; }
+  .joint { font-size: 14.5px; }
+  .tcp span { font-size: 11.5px; }
+  .tcp b { font-size: 15px; }
+  .barrow { font-size: 14.5px; }
+  .cam::before, .ov-helmet-cam::before { font-size: 12px; }
+  .cam-hint { font-size: 14.5px; }
+  .jog-group > span { font-size: 14px; }
+  kbd { font-size: 12px; }
+  .jj-row .jn { font-size: 15px; }
+  .jj-row .jn small { font-size: 12.5px; }
+  .jj-row button { font-size: 17.5px; }
+  .jj-row.grip button { font-size: 14.5px; }
+  .jbar b { font-size: 14.5px; }
+  h4.sub { font-size: 14px; }
+  details.more summary { font-size: 14.5px; }
+  .seq li::before { font-size: 12px; }
+  .tile span { font-size: 12.5px; }
+  .tile b { font-size: 17.5px; }
+  .ev .msg { font-size: 14.5px; }
+  .ev .meta { font-size: 12.5px; }
+  .ev .acts .btn { font-size: 14px; }
+  .thr-now { font-size: 15px; }
+  #vidCat .n { font-size: 13px; }
+  .vid-day { font-size: 13px; }
+  .logbox { font-size: 12.5px; }
+  .alarm-banner { font-size: 22px; }
+  .done-msg { font-size: 22px; }
+  .toast { font-size: 15px; }
+  .chart-empty { font-size: 14px; }
+  .legend { font-size: 13px; }
+  .donut-legend li { font-size: 14.5px; }
+  .subnav .n { font-size: 12px; }
+  .stats-head h2 { font-size: 22px; }
+  .st-kpis .kpi em { font-size: 12.5px; }
+  .rate-table table { font-size: 14.5px; }
+  .rate-table th { font-size: 12.5px; }
+}
