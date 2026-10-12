@@ -168,11 +168,6 @@ function render() {
   // header
   const b = $("#stateBadge");
   b.textContent = STATE_LABEL[sf.state] || sf.state; b.className = "state " + sf.state;
-  $("#minDist").textContent = sf.min_dist === null ? "사람 없음" : `가장 가까운 사람 ${fx(sf.min_dist, 2)} m`;
-  $("#profileTxt").textContent = `${sf.profile === "figure" ? "피규어 기준" : "실제 사람 기준"} · 감속 ${sf.thresholds.slow} m · 정지 ${sf.thresholds.stop} m · ` +
-    (cal.calibrated && cal.valid !== false ? "로봇 팔까지 거리" : cal.calibrated ? "카메라까지 거리 (보정 틀어짐)" : "카메라까지 거리 (보정 전)");
-  $("#reasons").textContent = sf.reasons.length ? "⚠ " + sf.reasons.join(" · ") : "활성 경보 없음";
-  $("#reasons").classList.toggle("alarm", sf.reasons.length > 0);
   renderStrip();
   const un = $("#unacked"); un.textContent = S.db.unacked; un.classList.toggle("hidden", !S.db.unacked);
 
@@ -221,7 +216,6 @@ function render() {
     "구역 판정": { CLEAR: "여유", SLOW: "감속 구역", STOP: "정지 구역" }[sf.zone] || sf.zone,
     "사라짐": `미확인 ${sf.vanish_unresolved}건 · 판정 대기 ${sf.vanish_pending}건`,
     "컨베이어": esc(sf.conveyor_alarm || "정상"), "조명 밝기": sf.brightness ?? "—",
-    "무인 시험 감시": sf.guard_person_m ? `${sf.guard_person_m} m` : "꺼짐",
   });
   const mode = rb.freedrive ? "직접 교시 중" : rb.torque ? "토크 켜짐" : "토크 꺼짐";
   const temps = rb.temp.length ? Math.max(...rb.temp) : "—";
@@ -314,7 +308,6 @@ function render() {
   if (thrShown !== sf.profile && S.safety_profiles) { thrShown = sf.profile; fillThr(); }
   $("#thrNow").innerHTML = `<b>${sf.profile === "figure" ? "피규어 시연" : "실제 사람"}</b> 적용 중 — 감속 ${sf.thresholds.slow} m · ` +
     `정지 ${sf.thresholds.stop} m · 재가동 허용 ${sf.thresholds.clear} m`;
-  setIfIdle("#guardM", sf.guard_person_m);
   if (S.fall) {
     $("#fallNow").textContent = `지금 확신도 ${Math.round(S.fall.conf * 100)}% 이상 · ${S.fall.sec}초`;
     if (!$("#fallSec").dataset.touched) setIfIdle("#fallSec", S.fall.sec);
@@ -692,7 +685,6 @@ on("#btnSlow", async () => {
   await api("/api/settings/slow_scale", { pct: +$("#slowPct").value }); delete $("#slowPct").dataset.touched;
   toast(`감속 속도 ${$("#slowPct").value}% — 바로 적용됩니다`, "ok");
 });
-on("#btnGuard", async () => { await api("/api/settings/guard", { meters: +$("#guardM").value }); toast("저장했습니다", "ok"); });
 on("#btnRec", async () => {
   await api("/api/settings/recording", { pre_sec: +$("#recPre").value, post_sec: +$("#recPost").value, conveyor_post_sec: +$("#recConv").value });
   await api("/api/settings/conveyor", { travel_timeout: +$("#convTimeout").value });
@@ -758,8 +750,9 @@ $$("#evCat button").forEach((b) => b.addEventListener("click", () => {
   evCat = b.dataset.c; $$("#evCat button").forEach((x) => x.classList.toggle("active", x === b)); loadEvents();
 }));
 // 대시보드 사고 현황 (도넛) + 이벤트 분류별 미확인 수
-const INC_COLOR = { human_stop: "#c81e1e", vanish: "#7c3aed", person_fall: "#db2777", conveyor_jam: "#ea580c", fire: "#7f1d1d",
-  estop: "#0f172a", fault: "#64748b", robot_fault: "#1d4ed8", pick_fail: "#0891b2" };
+// 사고 종류 색 — 서로 잘 구분되는 선명한 색 (2026-10-12 사용자: 통계 비비드하게)
+const INC_COLOR = { human_stop: "#ef4444", vanish: "#8b5cf6", person_fall: "#ec4899", conveyor_jam: "#f97316", fire: "#eab308",
+  estop: "#0ea5e9", fault: "#64748b", robot_fault: "#6366f1", pick_fail: "#14b8a6" };
 async function loadSummary() {
   const r = await api(`/api/events/summary?days=7`, undefined, "GET").catch(() => null); if (!r) return;
   for (const [c, n] of Object.entries(r.cat_unacked || {})) {
@@ -1001,18 +994,19 @@ window.addEventListener("resize", () => { clearTimeout(stResizeT); stResizeT = s
 function renderStats(r) {
   const T = r.totals, s = r.series;
   $("#stRange").textContent = `${s[0].date} ~ ${s[s.length - 1].date} · ${stDays === 1 ? "오늘" : `최근 ${stDays}일`}`;
-  const k = (label, val, unit, sub = "") => `<div class="kpi"><span>${label}</span><b>${val}</b><small>${unit}</small>${sub ? `<em>${sub}</em>` : ""}</div>`;
+  // 통계는 선명한 색 (2026-10-12 사용자): 숫자 카드마다 색띠·숫자 색
+  const k = (label, val, unit, sub = "", c = "#2563eb") => `<div class="kpi" style="--kc:${c}"><span>${label}</span><b>${val}</b><small>${unit}</small>${sub ? `<em>${sub}</em>` : ""}</div>`;
   $("#stKpis").innerHTML = [
-    k("총 작업 횟수", T.cycles, "회", `가동한 날 ${T.active_days}일`),
-    k("하루 평균 작업량", fx(T.avg_per_day, 1), "회/일", `가동일 기준 ${fx(T.avg_per_active_day, 1)}회`),
-    k("평균 사이클 시간", T.avg_cycle_s == null ? "—" : fx(T.avg_cycle_s, 1), "초", "작업 1회 걸린 시간"),
-    k("사고 건수", T.incidents, "건", T.top_incident ? `최다: ${esc(EVENT_LABEL[T.top_incident] || T.top_incident)}` : "사고 없음"),
-    k("작업 100회당 사고", T.incidents_per_100 == null ? "—" : fx(T.incidents_per_100, 1), "건", T.cycles_per_incident ? `사고 1건당 작업 ${fx(T.cycles_per_incident, 1)}회` : ""),
-    k("하루 평균 사고", fx(T.incidents / stDays, 1), "건/일", ""),
+    k("총 작업 횟수", T.cycles, "회", `가동한 날 ${T.active_days}일`, "#2563eb"),
+    k("하루 평균 작업량", fx(T.avg_per_day, 1), "회/일", `가동일 기준 ${fx(T.avg_per_active_day, 1)}회`, "#7c3aed"),
+    k("평균 사이클 시간", T.avg_cycle_s == null ? "—" : fx(T.avg_cycle_s, 1), "초", "작업 1회 걸린 시간", "#0891b2"),
+    k("사고 건수", T.incidents, "건", T.top_incident ? `최다: ${esc(EVENT_LABEL[T.top_incident] || T.top_incident)}` : "사고 없음", "#e11d48"),
+    k("작업 100회당 사고", T.incidents_per_100 == null ? "—" : fx(T.incidents_per_100, 1), "건", T.cycles_per_incident ? `사고 1건당 작업 ${fx(T.cycles_per_incident, 1)}회` : "", "#ea580c"),
+    k("하루 평균 사고", fx(T.incidents / stDays, 1), "건/일", "", "#db2777"),
   ].join("");
   drawBars($("#stDaily"), s.map((d) => ({ x: d.date.slice(5).replace("-", "/"), v: d.cycles,
-    tip: `${d.date} · ${d.cycles}회${d.avg_cycle_s ? ` · 평균 ${fx(d.avg_cycle_s, 1)}초` : ""}` })), { avg: T.avg_per_day, color: "#1f4f8f", unit: "회", fit: true });
-  drawBars($("#stHour"), r.by_hour.map((v, h) => ({ x: h % 3 === 0 ? String(h) : "", v, tip: `${h}시 · ${v}회` })), { color: "#3b82f6", unit: "회", W: 380, H: 220, fit: true });
+    tip: `${d.date} · ${d.cycles}회${d.avg_cycle_s ? ` · 평균 ${fx(d.avg_cycle_s, 1)}초` : ""}` })), { avg: T.avg_per_day, grad: ["#22d3ee", "#4f46e5"], unit: "회", fit: true });
+  drawBars($("#stHour"), r.by_hour.map((v, h) => ({ x: h % 3 === 0 ? String(h) : "", v, tip: `${h}시 · ${v}회` })), { grad: ["#f472b6", "#8b5cf6"], unit: "회", W: 380, H: 220, fit: true });
   drawDonutInto($("#stDonut"), $("#stLegend"), r.incidents, T.incidents, stDays === 1 ? "오늘" : `최근 ${stDays}일`);
   const rows = Object.entries(r.rate).slice(0, 12), mx = Math.max(1, ...rows.map(([, v]) => v.n));
   $("#stRate").innerHTML = rows.length ? `<table><thead><tr><th>이벤트</th><th class="bcol"></th><th>건수</th><th>하루 평균</th><th>100회당</th></tr></thead><tbody>` +
@@ -1032,16 +1026,19 @@ function drawBars(el, items, opt = {}) {
   const W = fit ? el.clientWidth : opt.W || 600, H = fit ? el.clientHeight : opt.H || 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
   const top = Math.max(1, ...items.map((d) => d.v), opt.avg || 0) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top), bw = (W - L - R) / n;
   const step = niceStep(top);
-  let s = "";
+  // grad: [위 색, 아래 색] 세로 그라데이션 막대 (통계 선명한 색)
+  const gid = opt.grad ? `g${el.id || "bars"}` : "";
+  let s = opt.grad ? `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${opt.grad[0]}"/><stop offset="1" stop-color="${opt.grad[1]}"/></linearGradient></defs>` : "";
   for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 5}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
   items.forEach((d, i) => {
     const x = L + i * bw + bw * 0.16, w = bw * 0.68, y = Y(d.v);
-    s += `<rect x="${x}" y="${y}" width="${w}" height="${Math.max(0, H - B - y)}" rx="2" fill="${opt.color || "#1f4f8f"}"><title>${esc(d.tip || "")}</title></rect>`;
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${Math.max(0, H - B - y)}" rx="3" fill="${gid ? `url(#${gid})` : opt.color || "#1f4f8f"}"><title>${esc(d.tip || "")}</title></rect>`;
     if (d.v && n <= 31) s += `<text x="${x + w / 2}" y="${y - 3}" class="tick">${d.v}</text>`;
     if (d.x && (n <= 14 || i % Math.ceil(n / 14) === 0)) s += `<text x="${x + w / 2}" y="${H - 8}" class="tick">${d.x}</text>`;
   });
-  if (opt.avg) s += `<line x1="${L}" y1="${Y(opt.avg)}" x2="${W - R}" y2="${Y(opt.avg)}" stroke="#16803c" stroke-width="1.5" stroke-dasharray="5 4"/>` +
-    `<text x="${L + 6}" y="${Y(opt.avg) - 5}" class="tick start avg" fill="#16803c">평균 ${fx(opt.avg, 1)}${opt.unit || ""}</text>`;
+  const ac = opt.grad ? "#10b981" : "#16803c";
+  if (opt.avg) s += `<line x1="${L}" y1="${Y(opt.avg)}" x2="${W - R}" y2="${Y(opt.avg)}" stroke="${ac}" stroke-width="2" stroke-dasharray="6 4"/>` +
+    `<text x="${L + 6}" y="${Y(opt.avg) - 5}" class="tick start avg" fill="${ac}">평균 ${fx(opt.avg, 1)}${opt.unit || ""}</text>`;
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${s}</svg>`;
 }
 function niceStep(top) { const raw = top / 4, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p; return Math.max(1, (m > 5 ? 10 : m > 2 ? 5 : m > 1 ? 2 : 1) * p); }
