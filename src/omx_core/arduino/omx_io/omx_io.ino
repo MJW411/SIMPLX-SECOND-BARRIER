@@ -4,7 +4,7 @@
 //   도착 센서 D5 · 투입 센서 D6 (IR 모듈 SZH-SSBH-002, 감지 시 LOW, 내부 풀업 — 빠진 핀이 '감지'로 읽히지 않게)
 //   2026-10-09 v4.2: 도착 센서를 D11 로 옮김 (D12 줄이 계속 LOW 로 붙어 있음 — 배선 확인 전 임시).
 //   2026-10-12 v4.3: 재배선 — 도착 D5 · 투입 D6 · 문 서보 D4 (도착/투입 D5·D6 배정은 실기에서 확인).
-//   2026-10-12 v4.4: 불꽃 센서(A0) 화재 감지 다시 켬 — 빛이 셀수록 값이 낮아지는 센서라 기준보다 '낮으면' 불꽃
+//   2026-10-12 v4.4: 불꽃 센서(A0) 화재 감지 다시 켬 — 빛이 셀수록 값이 낮아지는 센서라 기준 '이하'면 불꽃 (100)
 //                    (평상시 실측 849~868). 화재 때 벽면 LED 도 바닥 물결과 같은 색, 바닥 물결 꼬리 길게·간격 좁게.
 //   상태 줄 순서(s1 투입, s2 도착)는 그대로라 젯슨 쪽은 바뀌지 않는다.
 //   화염 센서 A0 (불꽃이면 값 감소), 출입문 서보 D4 (93° 닫힘 / 10° 열림), 컨베이어 L298N IN1 D9 · IN2 D10
@@ -64,8 +64,9 @@ const unsigned long SERVO_STEP_INTERVAL = SERVO_MOVE_TIME / abs(ANGLE_CLOSED - A
 // 불꽃 센서: 빛이 셀수록 값이 낮아진다 (2026-10-12 사용자 확인). 평상시(조명·LED 켜짐) 실측 849~868.
 // 2026-10-08 실기에서 기준 방향이 반대(크면 불꽃)라 늘 화재로 잡혀 보류했다 → 2026-10-12 v4.4: 방향 바로잡아 다시 켬.
 const bool FLAME_ENABLED = true;
-// 2026-10-12 라이터 실측: 가까이 290~480, 조금 멀리 606~700 / 평상시 849~1003 → 750 (평상시 최저와 약 100 여유)
-const int FLAME_THRESHOLD = 750;              // 이 값보다 낮으면 불꽃
+// 2026-10-12 라이터 실측: 가까이 6~123, 조금 멀리 290~790 / 평상시 849~1023.
+// 사용자 결정: 100 이하일 때만 화재 (가까운 불꽃만 — 잘못 울림 최소화)
+const int FLAME_THRESHOLD = 100;              // 이 값 이하면 불꽃
 const unsigned long FLAME_HOLD_TIME = 5000;   // 마지막 감지 후 화재 유지 (ms)
 const unsigned long FLAME_WARMUP = 2000;      // 전원 직후 0.5초쯤 값이 300대로 낮게 나온다(실측) → 그동안 무시
 const unsigned long FLAME_CONFIRM = 100;      // 기준 아래로 이만큼 계속 있어야 불꽃 (순간 튐 거르기)
@@ -257,7 +258,7 @@ void loop() {
   bool a = readDebounced(start);             // 투입 (젯슨이 출발 판단에 쓴다)
   bool b = readDebounced(arrive);            // 도착 (여기서 즉시 정지)
   flameValue = analogRead(PIN_FLAME);
-  bool high = FLAME_ENABLED && flameValue < FLAME_THRESHOLD && now >= FLAME_WARMUP;
+  bool high = FLAME_ENABLED && flameValue <= FLAME_THRESHOLD && now >= FLAME_WARMUP;
   if (high && !flameHigh) flameSince = now;
   flameHigh = high;
   if (high && now - flameSince >= FLAME_CONFIRM) { lastFlameTime = now; fireOn = true; }
