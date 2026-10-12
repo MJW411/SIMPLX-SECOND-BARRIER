@@ -135,6 +135,7 @@ function onEvent(ev) {
     $("#fallMsg").textContent = ev.message;
     const ft = new Date((ev.t || Date.now() / 1000) * 1000), p2 = (n) => String(n).padStart(2, "0");
     $("#fallTime").textContent = `${p2(ft.getHours())}:${p2(ft.getMinutes())}:${p2(ft.getSeconds())}`;
+    if (S?.fall) $("#fallHint").textContent = `넘어진 사람이 확신도 ${Math.round(S.fall.conf * 100)}% 이상으로 ${S.fall.sec}초 넘게 계속 보였습니다. 현장을 확인하세요. 사고 순간 영상은 영상 탭에 저장됩니다.`;
     $("#fallModal").classList.remove("hidden");
   }
   if (ev.type === "cycle_done") {                // 정한 횟수를 마침 → 팝업 (확인을 누를 때까지)
@@ -309,6 +310,11 @@ function render() {
   $("#thrNow").innerHTML = `<b>${sf.profile === "figure" ? "피규어 시연" : "실제 사람"}</b> 적용 중 — 감속 ${sf.thresholds.slow} m · ` +
     `정지 ${sf.thresholds.stop} m · 재가동 허용 ${sf.thresholds.clear} m`;
   setIfIdle("#guardM", sf.guard_person_m);
+  if (S.fall) {
+    $("#fallNow").textContent = `지금 확신도 ${Math.round(S.fall.conf * 100)}% 이상 · ${S.fall.sec}초`;
+    if (!$("#fallSec").dataset.touched) setIfIdle("#fallSec", S.fall.sec);
+    if (!$("#fallConf").dataset.touched) setIfIdle("#fallConf", Math.round(S.fall.conf * 100));
+  }
   if (S.slow_scale != null) {
     const sp = Math.round(S.slow_scale * 100);
     $("#slowNow").textContent = `지금 ${sp}%`;
@@ -664,6 +670,12 @@ on("#btnThr", async () => {
   await api("/api/settings/thresholds", { profile: prof, slow: +$("#thrSlow").value, stop: +$("#thrStop").value,
     clear: +$("#thrClear").value, vanish_grace: +$("#vanGrace").value });
   toast(`'${prof === "figure" ? "피규어 시연" : "실제 사람"}' 기준을 저장했고 바로 적용됩니다`, "ok");
+});
+["#fallSec", "#fallConf"].forEach((id) => $(id).addEventListener("input", (e) => { e.target.dataset.touched = "1"; }));
+on("#btnFall", async () => {
+  await api("/api/settings/fall", { sec: +$("#fallSec").value, conf_pct: +$("#fallConf").value });
+  delete $("#fallSec").dataset.touched; delete $("#fallConf").dataset.touched;
+  toast(`낙상 감지: 확신도 ${$("#fallConf").value}% 이상 ${$("#fallSec").value}초 — 바로 적용됩니다`, "ok");
 });
 $("#slowPct").addEventListener("input", (e) => { e.target.dataset.touched = "1"; $("#slowPctTxt").textContent = `${e.target.value}%`; });
 on("#btnSlow", async () => {

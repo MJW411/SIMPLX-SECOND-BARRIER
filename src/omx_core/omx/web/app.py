@@ -120,6 +120,7 @@ def create_app(ctx):
             "safety_profiles": C["safety"]["profiles"],
             "vanish_grace": C["safety"]["vanish_grace"],
             "slow_scale": C["safety"]["slow_scale"],
+            "fall": {"sec": C["safety"].get("fall_confirm_sec", 3.0), "conf": C["safety"].get("fall_min_conf", 0.6)},
             "sys": ctx.sysmon.snapshot(),
         }
 
@@ -565,6 +566,18 @@ def create_app(ctx):
             raise HTTPException(400, "범위: 0–5 m (0 = 끔)")
         ctx.safety.guard_person_m = m
         C.update("safety", {"guard_person_m": m})
+        return {"ok": True}
+
+    @app.post("/api/settings/fall")
+    def set_fall(body: dict = Body(...), user=Depends(require_user)):
+        """낙상 판단: 넘어진 사람이 확신도 conf_pct% 이상으로 sec 초 넘게 보이면 낙상 (2026-10-12 사용자). 바로 적용."""
+        sec, pct = float(body.get("sec", 3.0)), float(body.get("conf_pct", 60))
+        if not 0.5 <= sec <= 30:
+            raise HTTPException(400, "감지 시간 범위: 0.5–30 초")
+        if not 30 <= pct <= 95:
+            raise HTTPException(400, "확신도 범위: 30–95 %")
+        C.update("safety", {"fall_confirm_sec": round(sec, 1), "fall_min_conf": round(pct / 100, 2)})
+        ctx.hub.emit("settings", f"{user}: 낙상 감지 기준 변경 — 확신도 {pct:.0f}% 이상 {sec:g}초", level="info")
         return {"ok": True}
 
     @app.post("/api/settings/slow_scale")
