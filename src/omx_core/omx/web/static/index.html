@@ -386,6 +386,7 @@
             <p class="hint">정지 &lt; 감속 &lt; 재가동 허용 거리 순이어야 합니다. 사람이 재가동 허용 거리보다 멀어져야 재가동할 수 있습니다.
               거리는 사람(손)에서 로봇 팔 표면까지입니다. 인식→정지에 약 0.2초가 걸리므로 정지 거리는 10 cm 이상을 권장합니다.</p>
           </div>
+          <div class="stack">
           <div class="card">
             <div class="card-h"><h3>무인 시험 감시</h3></div>
             <div class="form-grid">
@@ -393,6 +394,14 @@
             </div>
             <button class="btn primary" id="btnGuard">저장</button>
             <p class="hint">무인 시험용 추가 보호입니다. 보정 여부와 관계없이 동작합니다.</p>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>감속 속도</h3><span class="muted small" id="slowNow"></span></div>
+            <label class="slider">감속 구간 속도 <input type="range" id="slowPct" min="10" max="80" step="5"><b id="slowPctTxt"></b></label>
+            <button class="btn primary" id="btnSlow">저장</button>
+            <p class="hint">사람이 감속 거리 안에 들어오면 로봇이 지금 설정한 속도의 이 비율로 움직입니다 (예: 35% = 약 3분의 1 속도).
+              저장하면 바로 적용됩니다. 낮을수록 안전하지만 작업이 느려집니다. 화재 때 홈으로 돌아가는 속도도 이 값을 씁니다.</p>
+          </div>
           </div>
         </div>
       </div>

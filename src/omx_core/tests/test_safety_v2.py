@@ -52,6 +52,14 @@ def feed(persons=(), n=1, ready=True, t=None):
         sm._step()
 
 
+print("[감속 속도 설정]")
+from omx.safety.manager import SLOW  # noqa: E402
+old_ss = C["safety"]["slow_scale"]
+C["safety"]["slow_scale"] = 0.5                     # 제어판에서 바꾼 값 (메모리에서만 — 실제 settings.json 은 건드리지 않음)
+check(sm._permit_for(SLOW, sm.profile())[0] == 0.5, "감속 구간 허가 배율 = 설정한 감속 속도 (바로 반영)")
+C["safety"]["slow_scale"] = old_ss
+check(sm._permit_for(SLOW, sm.profile())[0] == old_ss, f"되돌리면 원래 값 {old_ss}")
+
 print("[인식 모델 준비]")
 feed(n=3)
 sm.restart()
