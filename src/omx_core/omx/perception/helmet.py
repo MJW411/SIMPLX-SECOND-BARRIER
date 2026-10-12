@@ -8,7 +8,8 @@
   클래스 번호는 모델마다 다르므로 이름으로 찾는다. 헬멧 판정에는 마스크가 필요 없어 만들지 않는다.
 - 판정 방식 (helmet.match):
   * head (기본): 보이는 사람 모두 머리 영역(박스 위쪽)에 헬멧이 겹쳐야 착용. 사람 없이 헬멧만 보이면 열지 않는다.
-  * presence: 같은 화면에 사람과 헬멧이 함께 보이면 착용 (입구 카메라 각도에서 head 가 잘 안 될 때).
+  * presence: 사람마다 자기 몸 박스 안에 헬멧이 하나씩 있으면 착용 (입구 카메라 각도에서 head 가 잘 안 될 때).
+    헬멧 하나는 한 사람에게만 — 착용자와 미착용자가 함께 있으면 열지 않는다.
   * 옛 헬멧 전용 모델(helmet/head, 사람 클래스 없음): 헬멧이 있고 맨머리(head)가 없을 때.
 - 연속 N프레임 착용이어야 문 열림 요청. 미착용·불확실이면 닫힘 유지.
   마지막 확인 후 close_sec(기본 5초)가 지나면 닫는다. 문 명령 자체는 SiteController 가 보낸다.
@@ -37,6 +38,25 @@ def has_helmet(box, fallen, helmets, head_frac=0.35):
         if rx1 <= cx <= rx2 and ry1 <= cy <= ry2:
             return True
     return False
+
+
+def assign_helmets(persons, helmets, pad=0.1, top=0.15):
+    """presence 방식: 헬멧 하나는 한 사람에게만. 헬멧 중심이 사람 박스(좌우 pad, 위 top 여유) 안에 있으면 후보,
+    박스 위쪽 가운데에 가까운 짝부터 묶는다. 반환: 사람마다 헬멧이 짝지어졌는가 (2026-10-12 사용자:
+    착용자와 미착용자가 함께 있으면 열지 않는다 — 전에는 화면에 헬멧이 하나만 있어도 열렸다)."""
+    pairs = []
+    for i, (x1, y1, x2, y2) in enumerate(persons):
+        w, h = x2 - x1, y2 - y1
+        for j, (hx1, hy1, hx2, hy2) in enumerate(helmets):
+            cx, cy = (hx1 + hx2) / 2, (hy1 + hy2) / 2
+            if x1 - pad * w <= cx <= x2 + pad * w and y1 - top * h <= cy <= y2:
+                pairs.append((((cx - (x1 + x2) / 2) / w) ** 2 + ((cy - y1) / h) ** 2, i, j))
+    got, used = [False] * len(persons), set()
+    for _, i, j in sorted(pairs):
+        if not got[i] and j not in used:
+            got[i] = True
+            used.add(j)
+    return got
 
 
 class HelmetGate:
@@ -122,9 +142,11 @@ class HelmetGate:
             pconf = h.get("person_conf", h["conf"])
             persons = [(i, d) for i, d in enumerate(dets) if d.cls in self.person_ids and d.conf >= pconf]
             if h.get("match", "head") == "presence":
-                ok = bool(persons) and bool(helmets)
-                for i, _ in persons:
-                    self.last_ok[i] = ok
+                got = assign_helmets([d.box for _, d in persons], helmets)
+                for (i, _), g in zip(persons, got):
+                    self.last_ok[i] = g
+                missing = bool(persons) and not all(got)      # 헬멧 없는 사람이 한 명이라도 있으면 미착용 (2026-10-12)
+                ok = bool(persons) and not missing
             else:
                 for i, d in persons:
                     self.last_ok[i] = has_helmet(d.box, d.cls in self.fallen_ids, helmets, h.get("head_frac", 0.35))
@@ -138,9 +160,9 @@ class HelmetGate:
             if not self.wants_open(now):
                 log.info("헬멧 확인 — 출입문 열림")
             self.open_until = now + self.cfg["door"]["close_sec"]
-            self.state = "헬멧 확인 — 문 열림"
+            self.state = "헬멧 착용 확인 - 문 열림"       # 제어판 판정 문구 (2026-10-12 사용자)
         elif missing:
-            self.state = "헬멧 미착용 — 닫힘 유지"
+            self.state = "헬멧 미착용"
         elif ok:
             self.state = f"헬멧 확인 중 ({self._n}/{h['confirm_frames']})"
         elif helmets:
