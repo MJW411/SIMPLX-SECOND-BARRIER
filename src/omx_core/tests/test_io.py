@@ -242,8 +242,8 @@ cj.step(272.0)
 check(not sj.conveyor_alarm and "새로 시작" in evj.got[-1][1], "작업을 새로 시작하면 자동 해제")
 
 # ---- 시간 자동 해제: 아무 조건이 없어도 auto_clear_sec 뒤 저절로 풀고 재개 (수동 해제 버튼도 그대로)
-check(yaml.safe_load(open(Path(__file__).parent.parent / "config/default.yaml"))["conveyor"]["auto_clear_sec"] == 10.0,
-      "기본 설정: 시간 자동 해제 10초")
+check(yaml.safe_load(open(Path(__file__).parent.parent / "config/default.yaml"))["conveyor"]["auto_clear_sec"] == 0,
+      "기본 설정: 시간 자동 해제 끔 (팝업 재가동 버튼으로)")
 cft = copy.deepcopy(CFG); cft["conveyor"]["auto_clear_sec"] = 10.0
 vt = VirtualIO()
 evt = Events()
