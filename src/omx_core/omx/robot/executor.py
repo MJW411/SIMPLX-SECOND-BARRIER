@@ -323,6 +323,9 @@ class Executor:
         q_ref = self.current_q() if q_ref is None else q_ref
         qa = K.ik(x, y, z, pitch, q5, q1_hint=q_ref[0])
         q = np.concatenate([qa, [q_ref[5] if grip is None else grip]])
+        # 한계를 살짝(FIT_TOL 이하) 넘는 해는 한계로 당긴다 — 손목을 기구 멈춤점까지 꺾어 티칭한 자세로 가는 직선 이동이
+        # 늘 거부되던 문제 (2026-10-12 실기: PICK_UP 등 joint4=1.589, 한계 1.58). 관절 이동(move_joints)과 같은 보정.
+        q = self.fit_q(q)
         self.check_q(q)
         return q
 
