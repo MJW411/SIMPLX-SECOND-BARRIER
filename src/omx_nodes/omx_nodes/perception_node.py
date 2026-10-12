@@ -156,12 +156,10 @@ class PerceptionNode(OmxNode):
         C = self.cfg
         prof = C["safety"]["profiles"][C["safety"]["profile"]]
         labels = OS.Labels(img)
-        # 1) 로봇: 계산한 로봇 모습(거리 판단·보정 일치율에 쓰는 모양)을 옅은 하늘색 + 매끈한 테두리 + 관절 점 (시안 B)
+        # 1) 로봇 팔 선 (보정이 맞는지 보는 용도): 연한 하늘색 가는 선 + 그리퍼 끝 고리
         pts = self.ex.link_points()
         if pts is not None and self.calib.T_base_cam is not None and self.per.calib_valid and self.cam.intr is not None:
-            sil = self.per._fk_silhouette(img.shape, self.calib.T_base_cam, pts)
-            uv = self.calib.project(pts, self.cam.intr)
-            img = OS.draw_robot(img, sil, None if uv is None else uv[2:-1], None if uv is None else uv[-1])
+            img = OS.draw_skeleton(img, self.calib.project(pts, self.cam.intr))
         # 2) 사람·헬멧: 마스크(SEG)만 — 상자(BBOX)는 마스크가 없을 때만. 라벨은 마지막에 겹치지 않게
         helmets = getattr(pc, "helmets", []) if pc is not None else []
         tags = []

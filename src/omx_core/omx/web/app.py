@@ -742,9 +742,7 @@ def create_app(ctx):
         labels = OS.Labels(img)
         pts = ctx.ex.link_points()
         if pts is not None and ctx.calib.T_base_cam is not None and ctx.per.calib_valid and ctx.cam.intr is not None:
-            sil = ctx.per._fk_silhouette(img.shape, ctx.calib.T_base_cam, pts)
-            uv = ctx.calib.project(pts, ctx.cam.intr)
-            img = OS.draw_robot(img, sil, None if uv is None else uv[2:-1], None if uv is None else uv[-1])
+            img = OS.draw_skeleton(img, ctx.calib.project(pts, ctx.cam.intr))
         if pc is not None:
             layer, tags = img.copy(), []
             for p in pc.persons:

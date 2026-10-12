@@ -44,6 +44,22 @@ def draw_robot(img, sil, joints_uv=None, tcp_uv=None):
     return img
 
 
+def draw_skeleton(img, uv):
+    """로봇 팔 선 (2026-10-12 사용자: 모양 전체 칠하기는 별로 → 원래 선으로, 색만 연하게).
+    uv: 베이스부터 그리퍼 끝까지 관절 픽셀 (fk_points 투영). 가는 연하늘색 선을 반투명으로, 그리퍼 끝은 작은 분홍 고리."""
+    if uv is None or len(uv) < 2:
+        return img
+    p = np.asarray(uv, float).round().astype(int)
+    t = img.copy()
+    for a, b in zip(p[1:-1], p[2:]):
+        cv2.line(t, (int(a[0]), int(a[1])), (int(b[0]), int(b[1])), (255, 235, 170), 2, cv2.LINE_AA)
+    img = cv2.addWeighted(t, 0.6, img, 0.4, 0)
+    e = (int(p[-1][0]), int(p[-1][1]))
+    cv2.circle(img, e, 6, TCP, 1, cv2.LINE_AA)
+    cv2.circle(img, e, 2, TCP, -1, cv2.LINE_AA)
+    return img
+
+
 def mask_outline(img, poly, col):
     """사람·헬멧 마스크 테두리 (매끈하게). 면은 호출한 쪽이 layer 에 칠해 한 번에 섞는다."""
     cv2.polylines(img, [poly], True, col, 1, cv2.LINE_AA)
