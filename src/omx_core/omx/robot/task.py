@@ -350,6 +350,8 @@ class ConveyorMonitor:
       닿거나, 작업을 새로 시작하거나, 관리자가 해제 버튼을 누르면 이상을 풀고 로봇 작업을 멈춘 단계부터 이어서 한다.
       이상이 걸린 순간 투입 센서에 이미 물품이 있었다면 한 번 치웠다 다시 올려야 한다 (막힌 채 저절로 다시 돌지 않게).
       관리자 '해제' 버튼도 그대로 쓸 수 있다.
+    - 시간 자동 해제 (2026-10-12 사용자): 위 조건이 하나도 안 생겨도(물품을 손으로 치움 등) 이상이 걸린 뒤
+      conveyor.auto_clear_sec 초가 지나면 저절로 풀고 로봇 작업을 이어서 한다 (0 = 끔). 그대로 막혀 있으면 다시 제한시간 뒤 이상.
     - 화재면 멈춘다.
     """
 
@@ -362,6 +364,7 @@ class ConveyorMonitor:
         # 이 감시기가 건 이상 / 푼 시각 — 안전 노드 상태가 늦게 와도(노드 분리) 바로 반영되게
         self._jam = False
         self._jam_seen = False
+        self._jam_t = None          # 이상이 걸린 시각 (시간 자동 해제용)
         self._clear_t = -1e9
         self._was_working = False
         self._prev_loaded = False
@@ -404,8 +407,11 @@ class ConveyorMonitor:
         new_item = use_start and loaded and not self._prev_loaded       # 투입 센서: 없다가 생긴 순간
         self._prev_loaded = loaded if use_start else False
         alarm = self._alarm(now)
-        if alarm and (arrived or new_item or (working and not self._was_working)):
-            self._clear(now, "물품이 도착 센서에 닿음" if arrived else "투입 센서에 새 물품" if new_item else "작업을 새로 시작")
+        auto = float(self.cfg["conveyor"].get("auto_clear_sec", 0) or 0)
+        timed = auto > 0 and self._jam_t is not None and now - self._jam_t >= auto
+        if alarm and (arrived or new_item or (working and not self._was_working) or timed):
+            self._clear(now, "물품이 도착 센서에 닿음" if arrived else "투입 센서에 새 물품" if new_item
+                        else "작업을 새로 시작" if working and not self._was_working else f"{auto:.0f}초 지나 자동 해제")
             alarm = False
         if not alarm and self._paused_by_jam:          # 어떤 방법으로든 풀렸으면 로봇 작업 재개 (관리자 해제 포함)
             self._paused_by_jam = False
@@ -436,7 +442,7 @@ class ConveyorMonitor:
             self._set(False, "제한시간 초과")
             self.t_run = None
             msg = f"컨베이어 이상 — {to:.0f}초 동안 돌았지만 도착 센서에 물품이 오지 않음, 컨베이어 정지"
-            self._jam, self._jam_seen = True, False
+            self._jam, self._jam_seen, self._jam_t = True, False, now
             self.history.append({"t": round(time.time()), "s": round(float(to), 2), "jam": True})
             self.safety.conveyor_alarm = msg
             self.events.emit("conveyor_jam", msg, level="alarm", clip=True)
@@ -456,10 +462,12 @@ class ConveyorMonitor:
                 self._jam_seen = True
             elif self._jam_seen:                       # 관리자가 해제 버튼으로 풀었다
                 self._jam = False
+                self._jam_t = None
         return a or self._jam
 
     def _clear(self, now, why):
         self._jam = self._jam_seen = False
+        self._jam_t = None
         self._clear_t = now
         self.safety.conveyor_alarm = ""
         log.info("컨베이어 이상 자동 해제 — %s", why)

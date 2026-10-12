@@ -4,9 +4,10 @@
 //   도착 센서 D5 · 투입 센서 D6 (IR 모듈 SZH-SSBH-002, 감지 시 LOW, 내부 풀업 — 빠진 핀이 '감지'로 읽히지 않게)
 //   2026-10-09 v4.2: 도착 센서를 D11 로 옮김 (D12 줄이 계속 LOW 로 붙어 있음 — 배선 확인 전 임시).
 //   2026-10-12 v4.3: 재배선 — 도착 D5 · 투입 D6 · 문 서보 D4 (도착/투입 D5·D6 배정은 실기에서 확인).
+//   2026-10-12 v4.4: 불꽃 센서(A0) 화재 감지 다시 켬. 화재 때 벽면 LED 도 주황, 바닥 물결 꼬리 길게.
 //   상태 줄 순서(s1 투입, s2 도착)는 그대로라 젯슨 쪽은 바뀌지 않는다.
 //   화염 센서 A0 (불꽃이면 값 증가), 출입문 서보 D4 (93° 닫힘 / 10° 열림), 컨베이어 L298N IN1 D9 · IN2 D10
-//   벽면 네오픽셀 16개 D13: 평상시 백색, 사람 감속 주황(O), 사람 정지 빨강(R), 작업 완료 초록(C) — 화재·연결 끊김 때는 백색
+//   벽면 네오픽셀 16개 D13: 평상시 백색, 사람 감속 주황(O), 사람 정지 빨강(R), 작업 완료 초록(C), 화재 주황 — 연결 끊김 때는 백색
 //   대피 유도 네오픽셀 60개 D3
 //   D3: 평상시 은은한 백색, 화재 시 노란 물결이 아두이노 쪽에서 먼 끝(입구) 쪽으로 흐르며 대피 방향을 알린다
 //       (불꽃 센서가 직접 감지했을 때 + 젯슨이 화재 상황(Y)을 알리는 동안 — 관리자 '상황 종료'까지)
@@ -46,8 +47,8 @@ const int BRIGHTNESS = 80;
 const int GUIDE_PIXELS = 60;
 const float GUIDE_MAX = 0.80;                 // 물결 최대 밝기 비율 (시험 스케치 0.35 → 0.80, 2026-10-08 사용자: 더 밝게)
 const float GUIDE_WHITE = 0.20;               // 평상시 백색 밝기 비율 (은은하게)
-const float SPACING = 6.0;                    // 빛 덩어리 간격 (LED 개수). 시험 스케치 20 → 6 (2026-10-08 사용자 조정)
-const float TAIL = 5.0;                       // 꼬리 길이 (SPACING 보다 작게, 2026-10-08 사용자 조정)
+const float SPACING = 10.0;                   // 빛 덩어리 간격 (LED 개수). 시험 스케치 20 → 6 (2026-10-08) → 10 (2026-10-12 꼬리 늘리며)
+const float TAIL = 8.5;                       // 꼬리 길이 (SPACING 보다 작게). 5 → 8.5 (2026-10-12 사용자: 꼬리 더 길게)
 const float HEAD_SOFT = 1.5;                  // 머리 앞쪽 번짐
 const float SPEED = 6.0;                      // 초당 이동 칸 수
 const float BASE_GLOW = 0.04;                 // 바닥 은은한 빛
@@ -60,8 +61,8 @@ const unsigned long SERVO_MOVE_TIME = 600;   // 93° ↔ 10° 전체 이동 시�
 const unsigned long SERVO_STEP_INTERVAL = SERVO_MOVE_TIME / abs(ANGLE_CLOSED - ANGLE_OPEN);
 
 // 불꽃 센서: 단품 수광 소자 + 풀다운 (불꽃이면 값이 커짐). 2026-10-08 실기에서 LED·조명 빛에 포화(1023)돼
-// 보류 → 끔. 센서를 다시 달면 true 로 바꾸고 올린다 (기준은 사용자 시험 스케치 값 300).
-const bool FLAME_ENABLED = false;
+// 보류 → 끔. 2026-10-12 v4.4: 사용자 요청으로 다시 켬 (기준은 사용자 시험 스케치 값 300).
+const bool FLAME_ENABLED = true;
 const int FLAME_THRESHOLD = 300;              // 이 값보다 크면 불꽃
 const unsigned long FLAME_HOLD_TIME = 5000;   // 마지막 감지 후 화재 유지 (ms)
 const unsigned long FLAME_WARMUP = 2000;      // 전원 직후 화염 값이 0.5초쯤 300대에서 떨어진다(실측) → 그동안 무시
@@ -238,7 +239,7 @@ void setup() {
   servoArriveTime = millis();
 
   Serial.begin(9600);
-  Serial.println("# omx_io v4.3 (도착 D5 / 투입 D6 / 화염 A0 / 문 서보 D4 / 모터 D9,D10 / 조명 D13 / 대피유도 D3)");
+  Serial.println("# omx_io v4.4 (도착 D5 / 투입 D6 / 화염 A0 / 문 서보 D4 / 모터 D9,D10 / 조명 D13 / 대피유도 D3)");
   lastFrame = millis();
 }
 
@@ -265,10 +266,12 @@ void loop() {
   updateServo();
   // 대피 유도: 불꽃을 직접 봤을 때 + 젯슨이 화재 상황(Y)을 알리는 동안 (젯슨 연결이 끊겨도 불꽃이면 물결)
   updateGuide(fireOn || (linked && ledCmd == 'Y'), now);
-  // 벽면 D13: 사람 정지 빨강, 사람 감속 주황, 그 밖(대기·작업 중·화재·연결 끊김)은 백색. 같은 색이면 다시 그리지 않는다.
-  if (linked && ledCmd == 'R' && !fireOn) showColor(pixels.Color(255, 0, 0));
-  else if (linked && ledCmd == 'O' && !fireOn) showColor(pixels.Color(255, 90, 0));
-  else if (linked && ledCmd == 'C' && !fireOn) showColor(pixels.Color(0, 255, 0));
+  // 벽면 D13: 화재 주황(2026-10-12 사용자), 사람 정지 빨강, 사람 감속 주황, 그 밖(대기·작업 중·연결 끊김)은 백색.
+  // 같은 색이면 다시 그리지 않는다.
+  if (fireOn || (linked && ledCmd == 'Y')) showColor(pixels.Color(255, 90, 0));
+  else if (linked && ledCmd == 'R') showColor(pixels.Color(255, 0, 0));
+  else if (linked && ledCmd == 'O') showColor(pixels.Color(255, 90, 0));
+  else if (linked && ledCmd == 'C') showColor(pixels.Color(0, 255, 0));
   else showColor(pixels.Color(255, 255, 255));
 
   int st = a | b << 1 | fireOn << 2 | door << 3 | conv << 4;
