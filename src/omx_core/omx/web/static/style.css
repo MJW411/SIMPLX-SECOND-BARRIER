@@ -214,8 +214,8 @@ input[type=file] { padding: 6px; }
 #page-overview .gate-badge { padding: 8px 6px; }
 #page-overview .gate-badge b { font-size: clamp(16px, 11.5cqi, 30px); }
 #page-overview .gate-badge span { font-size: clamp(11px, 5.2cqi, 14px); }
-#page-overview .ov-helmet-side { grid-template-rows: auto minmax(0, 1fr); }   /* 판정 표는 내용만큼(작게), GATE 가 나머지 */
-#page-overview .ov-helmet-side .kv { grid-auto-rows: auto; font-size: clamp(13.5px, 6cqi, 16.5px); }
+#page-overview .ov-helmet-side { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }   /* 판정·검출 표 1 : GATE 1 (2026-10-12 사용자) */
+#page-overview .ov-helmet-side .kv { grid-auto-rows: 1fr; font-size: clamp(13.5px, 6cqi, 16.5px); }
 #page-overview .ov-helmet-side .kv dt, #page-overview .ov-helmet-side .kv dd { padding: 6px 10px; }
 #page-overview > .grid-2 > .stack:last-child > .card:last-child { flex: 1 1 0; display: flex; flex-direction: column; }
 #page-overview > .grid-2 > .stack:last-child > .card:last-child > .ov-helmet { flex: 1 1 auto; }
