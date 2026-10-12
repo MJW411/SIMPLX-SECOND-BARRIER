@@ -733,12 +733,26 @@ def create_app(ctx):
             layer = img.copy()
             for p in pc.persons:
                 col = (0, 0, 255) if p.dist < sm.profile()["stop"] else (0, 170, 255) if p.dist < sm.profile()["slow"] else (0, 200, 0)
+                x1, y1, x2, y2 = map(int, p.box)
+                # 사람 표시는 마스크(SEG)만 — 테두리 상자(BBOX)는 마스크가 없을 때만 (2026-10-12 사용자)
                 if p.poly is not None:
                     cv2.fillPoly(layer, [p.poly], col)
-                x1, y1, x2, y2 = map(int, p.box)
-                cv2.rectangle(img, (x1, y1), (x2, y2), col, 2)
+                    cv2.polylines(img, [p.poly], True, col, 2)
+                    y1 = int(np.min(p.poly[..., 1]))          # 글자는 마스크 맨 위에
+                    x1 = int(np.min(p.poly[..., 0]))
+                else:
+                    cv2.rectangle(img, (x1, y1), (x2, y2), col, 2)
                 txt = f"{p.dist:.2f}m" if np.isfinite(p.dist) else "?"
                 cv2.putText(img, f"person {p.conf:.2f} {txt}", (x1, max(14, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 2)
+            for hb, hc, hp in getattr(pc, "helmets", []) or []:      # 헬멧: 노란 마스크 (표시만)
+                hx1, hy1, hx2, hy2 = map(int, hb)
+                if hp is not None:
+                    cv2.fillPoly(layer, [hp], (0, 215, 255))
+                    cv2.polylines(img, [hp], True, (0, 215, 255), 2)
+                    hx1, hy1 = int(np.min(hp[..., 0])), int(np.min(hp[..., 1]))
+                else:
+                    cv2.rectangle(img, (hx1, hy1), (hx2, hy2), (0, 215, 255), 2)
+                cv2.putText(img, f"helmet {hc:.2f}", (hx1, max(14, hy1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 215, 255), 2)
             img = cv2.addWeighted(layer, 0.35, img, 0.65, 0)
         pts = ctx.ex.link_points()
         if pts is not None and ctx.calib.T_base_cam is not None and ctx.per.calib_valid:
