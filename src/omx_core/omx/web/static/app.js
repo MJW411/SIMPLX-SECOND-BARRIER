@@ -294,6 +294,11 @@ function render() {
   $("#thrNow").innerHTML = `<b>${sf.profile === "figure" ? "피규어 시연" : "실제 사람"}</b> 적용 중 — 감속 ${sf.thresholds.slow} m · ` +
     `정지 ${sf.thresholds.stop} m · 재가동 허용 ${sf.thresholds.clear} m`;
   setIfIdle("#guardM", sf.guard_person_m);
+  if (S.slow_scale != null) {
+    const sp = Math.round(S.slow_scale * 100);
+    $("#slowNow").textContent = `지금 ${sp}%`;
+    if (document.activeElement !== $("#slowPct") && !$("#slowPct").dataset.touched) { $("#slowPct").value = sp; $("#slowPctTxt").textContent = `${sp}%`; }
+  }
   thrPreview();
   tag("#calTag", !cal.calibrated ? "보정 전" : cal.valid === false ? "보정 틀어짐" : "보정 완료", cal.calibrated && cal.valid !== false ? "ok" : "warn");
   kv("#calKv", {
@@ -638,6 +643,11 @@ on("#btnThr", async () => {
   await api("/api/settings/thresholds", { profile: prof, slow: +$("#thrSlow").value, stop: +$("#thrStop").value,
     clear: +$("#thrClear").value, vanish_grace: +$("#vanGrace").value });
   toast(`'${prof === "figure" ? "피규어 시연" : "실제 사람"}' 기준을 저장했고 바로 적용됩니다`, "ok");
+});
+$("#slowPct").addEventListener("input", (e) => { e.target.dataset.touched = "1"; $("#slowPctTxt").textContent = `${e.target.value}%`; });
+on("#btnSlow", async () => {
+  await api("/api/settings/slow_scale", { pct: +$("#slowPct").value }); delete $("#slowPct").dataset.touched;
+  toast(`감속 속도 ${$("#slowPct").value}% — 바로 적용됩니다`, "ok");
 });
 on("#btnGuard", async () => { await api("/api/settings/guard", { meters: +$("#guardM").value }); toast("저장했습니다", "ok"); });
 on("#btnRec", async () => {

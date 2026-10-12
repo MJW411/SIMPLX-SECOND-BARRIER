@@ -136,6 +136,7 @@ def create_app(ctx):
             "door_roi": C["safety"].get("door_roi_px"),
             "safety_profiles": C["safety"]["profiles"],
             "vanish_grace": C["safety"]["vanish_grace"],
+            "slow_scale": C["safety"]["slow_scale"],
             "map": {**(pc.get("persons") or {}), "zone": C["safety"]["zone_base"]},
             "sys": ctx.sysmon.snapshot(),
             "nodes": ctx.node_status(),
@@ -504,6 +505,16 @@ def create_app(ctx):
             raise HTTPException(400, "범위: 0–5 m (0 = 끔)")
         ctx.update_config("safety", {"guard_person_m": m})
         R("safety", "set_guard", meters=m)
+        return {"ok": True}
+
+    @app.post("/api/settings/slow_scale")
+    def set_slow_scale(body: dict = Body(...), user=Depends(require_user)):
+        """감속 구간에서 허용하는 로봇 속도 비율 (%). 저장하면 바로 적용 (2026-10-12 사용자)."""
+        pct = float(body.get("pct", 35))
+        if not 10 <= pct <= 80:
+            raise HTTPException(400, "범위: 10–80 %")
+        ctx.update_config("safety", {"slow_scale": round(pct / 100, 2)})
+        ctx.events.emit("settings", f"{user}: 감속 속도 {pct:.0f}% 로 변경", level="info")
         return {"ok": True}
 
     @app.get("/api/logs")
