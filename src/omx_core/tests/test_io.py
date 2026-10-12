@@ -396,6 +396,12 @@ check(run_gate([V(0, (100, 300, 400, 360)), V(1, (360, 315, 390, 345))]).wants_o
 check(run_gate([V(2, HUMAN), V(1, HAND_HELMET)], match="presence").wants_open(t + 0.7),
       "v2 presence: 사람과 헬멧이 함께 보이면 열림")
 check(not run_gate([V(1, HEAD_HELMET)], match="presence").wants_open(t + 0.7), "v2 presence: 헬멧만 → 닫힘")
+gp = run_gate([V(2, HUMAN)], match="presence")
+check(not gp.wants_open(t + 0.7) and gp.state == "헬멧 미착용", f"v2 presence: 헬멧 없는 사람 → '헬멧 미착용' 표시 ({gp.state})")
+gp = run_gate([V(2, HUMAN), V(1, HAND_HELMET)], match="presence")
+check(gp.state == "헬멧 착용 확인 - 문 열림", f"v2 presence: 착용 확인 문구 ({gp.state})")
+gp = run_gate([V(2, HUMAN, 0.3)], match="presence")
+check(gp.state == "사람 확인 중", f"v2 presence: 사람인지 불확실(확신도 낮음)하면 '사람 확인 중' ({gp.state})")
 
 print()
 print("실패 %d건" % len(fails) if fails else "모두 통과")

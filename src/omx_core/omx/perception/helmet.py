@@ -123,6 +123,7 @@ class HelmetGate:
             persons = [(i, d) for i, d in enumerate(dets) if d.cls in self.person_ids and d.conf >= pconf]
             if h.get("match", "head") == "presence":
                 ok = bool(persons) and bool(helmets)
+                missing = bool(persons) and not helmets       # 사람은 보이는데 헬멧이 없다 → 미착용 (2026-10-12)
                 for i, _ in persons:
                     self.last_ok[i] = ok
             else:
