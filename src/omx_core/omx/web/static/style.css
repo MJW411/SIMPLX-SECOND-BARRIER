@@ -6,7 +6,7 @@
   --line: #d8dde5; --line-2: #c3cad5;
   --text: #17202e; --muted: #5a6577; --faint: #97a1b1;
   --accent: #1f4f8f; --accent-2: #173f74; --accent-soft: #e7eef8;
-  --nav: #0b3a8c; --nav-2: #134aa6; --nav-line: #2356a8; --nav-text: #dce7ff;
+  --nav: #0081ff; --nav-2: #006ee0; --nav-line: #2a96ff; --nav-text: #ffffff;
   --ok: #15803d; --ok-bg: #e6f4ea; --warn: #b45309; --warn-bg: #fff4dc; --danger: #c81e1e; --danger-bg: #fdecec;
   --info: #1d4ed8; --info-bg: #e8effc; --orange: #ea580c;
   --radius: 6px; --shadow: 0 1px 2px rgba(16, 24, 40, .06);
@@ -43,9 +43,9 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .brand.big img { width: 42px; height: 42px; } .brand.big b { font-size: 18px; } .login-card .brand { border-bottom-color: var(--line); }
 .sidebar a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 4px; color: var(--nav-text);
   cursor: pointer; user-select: none; position: relative; font-weight: 600; font-size: 15.5px; padding: 11px 12px; }
-.sidebar a svg { color: #a9c3f2; width: 20px; height: 20px; }
+.sidebar a svg { color: #e3f0ff; width: 20px; height: 20px; }
 .sidebar a:hover { background: var(--nav-2); color: #fff; } .sidebar a:hover svg { color: #c7d2e2; }
-.sidebar a.active { background: rgba(255,255,255,.18); color: #fff; font-weight: 700; } .sidebar a.active svg { color: #fff; }
+.sidebar a.active { background: rgba(0,40,110,.28); color: #fff; font-weight: 700; } .sidebar a.active svg { color: #fff; }
 .sidebar a.active::before { content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: #ffffff; }
 .count { margin-left: auto; font-style: normal; background: var(--danger); color: #fff; border-radius: 3px; font-size: 11px; padding: 1px 6px; font-weight: 700; }
 .side-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; color: var(--nav-text); font-size: 12px; padding: 10px 8px 4px; border-top: 1px solid var(--nav-line); }
