@@ -238,6 +238,11 @@ function render() {
   if (document.activeElement !== sp) { sp.max = Math.round(rb.speed_cap * 100); sp.value = Math.round(rb.speed_ratio * 100); }
   $("#speedTxt").textContent = `${Math.round(rb.speed_ratio * 100)}%`;
   $("#speedCap").textContent = `${Math.round(rb.speed_cap * 100)}%`;
+  if (S.start_speed != null) {
+    const ss = Math.round(S.start_speed * 100), now = Math.round(rb.speed_ratio * 100);
+    $("#speedStart").textContent = `켤 때 시작 속도 ${ss}%` + (ss !== now ? " · 지금 속도와 다름" : "");
+    $("#btnSpeedSave").disabled = ss === now;
+  }
   kv("#motionKv", { "비상정지": rb.estop ? '<span class="err">눌림</span>' : "해제", "휴식 자세": rb.at_rest ? "예" : "아니오",
     "제어 주기": `${rb.loop_ms} ms`, "알림": esc(rb.stall_note || "—") });
   $("#jointList").innerHTML = JOINTS.map((n, i) => {
@@ -573,6 +578,11 @@ const goHome = () => api("/api/robot/home"), stopMotion = () => api("/api/robot/
 on("#btnHome", goHome); on("#btnStop", stopMotion);
 on("#btnReset", async () => { const r = await api("/api/robot/reset"); toast("해제: " + (r.result || "완료"), "ok", 8000); });
 $("#speed").addEventListener("change", (e) => api("/api/robot/speed", { ratio: e.target.value / 100 }).catch(() => {}));
+// 지금 속도를 시작 속도로 저장 (다시 켜도 이 속도로 시작, 2026-10-12 사용자)
+on("#btnSpeedSave", async () => {
+  await api("/api/robot/speed_save", { ratio: $("#speed").value / 100 });
+  toast(`로봇 속도 ${$("#speed").value}% 를 저장했습니다 — 다시 켜도 이 속도로 시작합니다`, "ok");
+});
 try { const v = localStorage.getItem("omxCycleCount"); if (v !== null) $("#cycleCount").value = v; } catch (_) {}
 on("#btnCycleStart", async () => {
   const n = Math.max(0, Math.floor(Number($("#cycleCount").value) || 0));

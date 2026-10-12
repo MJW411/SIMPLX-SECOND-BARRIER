@@ -117,6 +117,10 @@ check(0.35 < d3 < 0.45, f"40 cm 떨어진 사람 거리 {d3:.2f} m")
 
 # ---- 실행기
 bus = SimBus()
+for want, got in ((0.15, 0.15), (0.5, C.limits["speed_cap_ratio"]), (None, C.limits["speed_default_ratio"])):
+    rc = dict(C["robot"]); rc["start_speed_ratio"] = want
+    sp = Executor(SimBus(), rc, C.limits, on_event=lambda *a: None).speed_ratio
+    check(abs(sp - got) < 1e-9, f"저장한 시작 속도 {want} → 켤 때 {sp} (상한 {C.limits['speed_cap_ratio']}, 없으면 기본값)")
 ex = Executor(bus, C["robot"], C.limits, on_event=lambda *a: None)
 ex.start()
 ex.set_torque(True)

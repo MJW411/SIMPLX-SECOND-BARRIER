@@ -86,7 +86,9 @@ class Executor:
         self.qmin = np.array([lim[j][0] + m for j in JOINTS] + [limits["gripper_limits"][0]])
         self.qmax = np.array([lim[j][1] - m for j in JOINTS] + [limits["gripper_limits"][1]])
         self.box = limits["workspace_box"]
-        self.speed_ratio = limits["speed_default_ratio"]
+        # 시작 속도: 제어판에서 저장한 값(robot.start_speed_ratio, 2026-10-12)이 있으면 그것, 없으면 기본값. 상한 안으로.
+        self.speed_ratio = float(min(max(cfg.get("start_speed_ratio") or limits["speed_default_ratio"], 0.01),
+                                     limits["speed_cap_ratio"]))
         self.cart_speed = limits["cart_speed_default"]
 
         self.lock = threading.RLock()
