@@ -196,10 +196,14 @@ input[type=file] { padding: 6px; }
 #page-overview > .grid-2 > .stack:first-child #kpis { flex: 1 1 auto; grid-auto-rows: 1fr; }
 #page-overview #kpis .kpi { display: flex; flex-direction: column; justify-content: center; }
 /* 오른쪽이 짧을 때: 입구 카메라 칸이 늘어나고, 영상은 늘어난 높이를 채운다 (어느 쪽이 짧든 끝선이 맞게) */
-/* 오른쪽 열 높이 비율: 안전 2 : 입구 카메라·헬멧 1 (2026-10-12 사용자) */
-#page-overview > .grid-2 > .stack:last-child > .card:first-child { flex: 2 1 0; display: flex; flex-direction: column; }
+/* 오른쪽 열 높이 비율: 안전 1 : 입구 카메라·헬멧 1 (2026-10-12 사용자) */
+#page-overview > .grid-2 > .stack:last-child > .card:first-child { flex: 1 1 0; display: flex; flex-direction: column; }
 /* 칸 안 최적화: 안전 칸의 표가 남는 높이를 고르게 채우고, GATE 글자는 칸 폭에 맞춰 크기가 바뀐다 */
 #page-overview #safetyKv { flex: 1 1 auto; grid-auto-rows: 1fr; min-height: 0; }
+#page-overview .ov-safety-btns { flex-wrap: nowrap; }
+#page-overview .ov-safety-btns .btn.big { flex: 1 1 auto; }
+#page-overview .ov-safety-btns .btn.toggle, #page-overview .ov-safety-btns .btn.danger { flex: none; align-self: stretch; }
+#page-overview #distGauge svg { max-height: 92px; }
 #page-overview #safetyKv dt, #page-overview #safetyKv dd { display: flex; align-items: center; }
 #page-overview .ov-helmet-side { container-type: inline-size; }
 #page-overview .gate-badge { padding: 8px 6px; }
