@@ -654,10 +654,18 @@ def create_app(ctx):
     def calib_sample(body: dict = Body(default={}), user=Depends(require_user)):
         return run("perception", "calib_sample", u=body.get("u"), v=body.get("v"))
 
+
+    def _work_yaws(teach):
+        """프로그램(시작 전 + 반복)이 쓰는 자세들의 베이스 방향 (자동 보정이 작업 자리도 돌게)."""
+        poses = (teach or {}).get("poses", {})
+        names = [s.get("pose") for s in (teach or {}).get("before_start", []) + (teach or {}).get("sequence", [])
+                 if s.get("type") in ("move", "linear")]
+        return [float(poses[n]["q"][0]) for n in dict.fromkeys(names) if n in poses]
+
     @app.post("/api/calib/auto")
     def calib_auto(user=Depends(require_user)):
         guard_motion()
-        return run("perception", "calib_auto")
+        return run("perception", "calib_auto", work_yaws=_work_yaws(ctx.snap("robot").get("teach")))
 
     @app.post("/api/calib/solve")
     def calib_solve(user=Depends(require_user)):

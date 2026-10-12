@@ -90,14 +90,25 @@ def solve(samples):
                "inlier": float(inl.mean()), "poses": len(samples)}
 
 
-def calib_poses(yaw0, box):
-    """보정용 자세 (TCP, 베이스 방향 yaw0 주변). 높이·거리·방향을 섞어 한 평면에 몰리지 않게."""
+def calib_poses(yaw0, box, work_yaws=()):
+    """보정용 자세 (TCP, 베이스 방향 yaw0 주변). 높이·거리·방향을 섞어 한 평면에 몰리지 않게.
+    work_yaws: 실제 작업 방향(프로그램이 쓰는 자세들의 베이스 각도). 방향마다 3자세를 더해 사람이 다가오는
+    작업 자리에서 가장 잘 맞게 한다 (2026-10-12: 8자세가 시작 방향 ±0.4 rad 에만 몰려 PICK·PLACE 쪽이 어긋났다).
+    작업대에 닿지 않게 기존 자세와 같은 높이(10~20 cm)만 쓴다."""
     out = []
     for dyaw, r, z, pitch in [(0, 0.16, 0.16, 0.9), (0.35, 0.20, 0.10, 1.2), (-0.35, 0.20, 0.10, 1.2),
                               (0.2, 0.24, 0.20, 0.6), (-0.2, 0.24, 0.20, 0.6), (0, 0.12, 0.24, 0.4),
                               (0.4, 0.14, 0.14, 1.0), (-0.4, 0.14, 0.14, 1.0)]:
         y = yaw0 + dyaw
         out.append((-0.01125 + r * math.cos(y), r * math.sin(y), z, pitch))
+    picked = []
+    for wy in work_yaws:                                  # 시작 방향과 겹치거나 서로 가까운 방향은 하나로
+        if abs(wy - yaw0) > 0.3 and all(abs(wy - p) > 0.3 for p in picked):
+            picked.append(wy)
+    for wy in sorted(picked[:2], key=lambda v: abs(v - yaw0)):   # 최대 2방향 × 3 = 6자세 (총 14)
+        for dyaw, r, z, pitch in [(0, 0.18, 0.12, 1.1), (0.15, 0.22, 0.18, 0.7), (-0.15, 0.15, 0.20, 0.8)]:
+            y = wy + dyaw
+            out.append((-0.01125 + r * math.cos(y), r * math.sin(y), z, pitch))
     return out
 
 
@@ -143,8 +154,9 @@ class AutoCalibrator:
         self.status = ""
         self.running = False
 
-    def start(self):
+    def start(self, work_yaws=()):
         import threading
+        self.work_yaws = [float(v) for v in (work_yaws or [])]
         if self.running:
             raise RuntimeError("이미 실행 중")
         ex = self.ctx.ex
@@ -160,7 +172,7 @@ class AutoCalibrator:
         q_start = ex.current_q()
         samples = []
         try:
-            poses = calib_poses(q_start[0], None)
+            poses = calib_poses(q_start[0], None, getattr(self, "work_yaws", ()))
             for i, tgt in enumerate(poses):
                 self.status = f"보정 자세 {i + 1}/{len(poses)}로 이동 중"
                 try:

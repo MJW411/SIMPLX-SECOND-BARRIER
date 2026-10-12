@@ -179,6 +179,14 @@ function render() {
       ? `<div>아래 조건이 풀리면 재가동할 수 있습니다.</div><ul>${hard.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`
       : `<div><b>재가동</b>을 누르면 비상정지·고장 해제와 토크 켜기까지 한 번에 합니다.</div>`);
   } else lb.classList.add("hidden");
+  // 영상 위 보정 일치율: 영상의 로봇 색 픽셀 중 계산한 로봇 모습 안에 드는 비율 (1초마다 다시 잼)
+  const cf = $("#camFit");
+  cf.classList.toggle("hidden", !cal.calibrated);
+  if (cal.calibrated) {
+    const fp = cal.fit == null ? null : Math.round(cal.fit * 100);
+    cf.textContent = cal.valid === false ? `보정 틀어짐${fp != null ? ` ${fp}%` : ""}` : fp == null ? "보정 일치율 —" : `보정 일치율 ${fp}%`;
+    cf.className = "cam-fit " + (cal.valid === false || (fp != null && fp < 65) ? "bad" : fp != null && fp < 80 ? "warn" : "ok");
+  }
   tag("#calBadge", !cal.calibrated ? "보정 전" : cal.valid === false ? "보정 틀어짐" : "보정 완료", cal.calibrated && cal.valid !== false ? "ok" : "warn");
   const calBad = cal.calibrated && cal.valid === false;
   $("#calWarn").classList.toggle("hidden", cal.calibrated && !calBad);

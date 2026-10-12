@@ -700,10 +700,18 @@ def create_app(ctx):
         tcp = K.fk_points(ctx.ex.state.q)[-1]
         return run(lambda: ctx.calib.add_sample(lat, ctx.cam.intr, tcp, body.get("u"), body.get("v")))
 
+
+    def _work_yaws(teach):
+        """프로그램(시작 전 + 반복)이 쓰는 자세들의 베이스 방향 (자동 보정이 작업 자리도 돌게)."""
+        poses = (teach or {}).get("poses", {})
+        names = [s.get("pose") for s in (teach or {}).get("before_start", []) + (teach or {}).get("sequence", [])
+                 if s.get("type") in ("move", "linear")]
+        return [float(poses[n]["q"][0]) for n in dict.fromkeys(names) if n in poses]
+
     @app.post("/api/calib/auto")
     def calib_auto(user=Depends(require_user)):
         guard_motion()
-        return run(ctx.autocalib.start)
+        return run(lambda: ctx.autocalib.start(_work_yaws(ctx.teach.snapshot())))
 
     @app.post("/api/calib/solve")
     def calib_solve(user=Depends(require_user)):
@@ -755,13 +763,17 @@ def create_app(ctx):
                 cv2.putText(img, f"helmet {hc:.2f}", (hx1, max(14, hy1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 215, 255), 2)
             img = cv2.addWeighted(layer, 0.35, img, 0.65, 0)
         pts = ctx.ex.link_points()
-        if pts is not None and ctx.calib.T_base_cam is not None and ctx.per.calib_valid:
-            uv = ctx.calib.project(pts[1:], ctx.cam.intr)
+        if pts is not None and ctx.calib.T_base_cam is not None and ctx.per.calib_valid and ctx.cam.intr is not None:
+            sil = ctx.per._fk_silhouette(img.shape, ctx.calib.T_base_cam, pts)    # 계산한 로봇 모습 전체 (반투명 하늘색)
+            if sil.any():
+                tint = img.copy()
+                tint[sil] = (255, 230, 0)
+                img = cv2.addWeighted(tint, 0.30, img, 0.70, 0)
+                cs, _ = cv2.findContours(sil.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(img, cs, -1, (255, 230, 0), 2)
+            uv = ctx.calib.project(pts[-1:], ctx.cam.intr)
             if uv is not None:
-                uv = uv.astype(int)
-                for a, b in zip(uv[:-1], uv[1:]):
-                    cv2.line(img, tuple(a), tuple(b), (255, 255, 0), 3)
-                cv2.circle(img, tuple(uv[-1]), 5, (255, 0, 255), -1)
+                cv2.circle(img, tuple(uv.astype(int)[-1]), 5, (255, 0, 255), -1)
         roi = C["safety"].get("door_roi_px")
         if roi:
             cv2.rectangle(img, (roi[0], roi[1]), (roi[2], roi[3]), (255, 200, 0), 2)
