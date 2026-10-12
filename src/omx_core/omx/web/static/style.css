@@ -434,6 +434,12 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .rate-table .bcol { width: 45%; }
 .rbar { height: 10px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
 .rbar span { display: block; height: 100%; background: #9aa6b8; border-radius: 2px; }
+/* 통계 선명한 색 (2026-10-12 사용자): 숫자 카드 색띠·숫자 색, 일반 기록 막대는 청록 */
+#stKpis .kpi { border-top: 4px solid var(--kc, transparent); }
+.st-kpis .kpi b { color: var(--kc, var(--text)); }
+#stRate .rbar { height: 12px; border-radius: 6px; }
+#stRate .rbar span { background: linear-gradient(90deg, #2dd4bf, #0d9488); border-radius: 6px; }
+#stRate tr td i { background: #14b8a6; }
 @media (max-width: 1280px) { .st-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .st-kpis .kpi:nth-child(n+4) { border-top: 1px solid var(--line); } .st-kpis .kpi:nth-child(3) { border-right: 0; } }
 /* 로봇·작업: 왼쪽 로봇 제어·관절 / 가운데 프로그램 / 오른쪽 실행·단계 편집. 넓은 화면에서는 한 화면에 꽉 차고 긴 목록은 칸 안에서 스크롤 */
 .rw-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
@@ -626,7 +632,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   #page-stats .card-h .small, #page-stats .hint { color: #3c475a; font-weight: 600; }
   #page-stats .stats-head .small, #page-stats .st-kpis .kpi em { color: var(--muted); font-weight: 400; }   /* 날짜·숫자 아래 설명은 보통 굵기 (사용자) */
   #page-stats .kpi span { color: #2f3b4e; font-weight: 800; }
-  #page-stats .kpi b { color: #0f172a; font-weight: 800; }
+  #page-stats .kpi b { color: var(--kc, #0f172a); font-weight: 800; }
   #page-stats .kpi small { color: #3c475a; font-weight: 600; }
   #page-stats .rate-table th { color: #2f3b4e; font-weight: 800; }
   #page-stats .rate-table td { color: #0f172a; font-weight: 600; }
