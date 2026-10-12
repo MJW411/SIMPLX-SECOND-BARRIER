@@ -351,6 +351,16 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .ov-helmet-cam::before { content: "CAM 02 · 입구"; }
 .ov-helmet-img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0b0f16; border-radius: 4px; }
 @media (max-width: 520px) { .ov-helmet { grid-template-columns: 1fr; } }
+.ov-helmet-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ov-helmet-side .kv { margin-top: 0; }
+/* 출입문 상태 크게: GATE OPEN(초록) / GATE CLOSED(회색) / 화재로 열림(주황) */
+.gate-badge { border-radius: 6px; border: 2px solid; padding: 14px 12px; text-align: center; transition: background .2s, color .2s; }
+.gate-badge b { display: block; font: 800 26px/1.15 var(--mono); letter-spacing: .04em; white-space: nowrap; }
+.gate-badge span { display: block; margin-top: 4px; font-size: 13.5px; font-weight: 600; }
+.gate-badge.open { background: #dcfce7; border-color: #16a34a; color: #14532d; }
+.gate-badge.closed { background: #eef1f5; border-color: #9aa6b8; color: #1f2937; }
+.gate-badge.fire { background: #ffedd5; border-color: #ea580c; color: #7c2d12; animation: gateblink 1s steps(1) infinite; }
+@keyframes gateblink { 50% { border-color: #fdba74; } }
 .viz.map { background: var(--sunk); border: 1px solid var(--line); border-radius: 4px; padding: 8px; }
 .viz.map svg { max-height: 360px; }
 .viz .zone { fill: #fff; stroke: var(--line-2); stroke-width: .6; }
@@ -597,10 +607,11 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   #page-overview .grid-2 > .stack:last-child .btn { font-weight: 700; }
   #page-overview .grid-2 > .stack:last-child .hint { color: #3c475a; }
   #page-stats .stats-head h2, #page-stats .card-h h3 { font-weight: 800; color: #0f172a; }
-  #page-stats .stats-head .small, #page-stats .card-h .small, #page-stats .hint { color: #3c475a; font-weight: 600; }
+  #page-stats .card-h .small, #page-stats .hint { color: #3c475a; font-weight: 600; }
+  #page-stats .stats-head .small, #page-stats .st-kpis .kpi em { color: var(--muted); font-weight: 400; }   /* 날짜·숫자 아래 설명은 보통 굵기 (사용자) */
   #page-stats .kpi span { color: #2f3b4e; font-weight: 800; }
   #page-stats .kpi b { color: #0f172a; font-weight: 800; }
-  #page-stats .kpi small, #page-stats .st-kpis .kpi em { color: #3c475a; font-weight: 600; }
+  #page-stats .kpi small { color: #3c475a; font-weight: 600; }
   #page-stats .rate-table th { color: #2f3b4e; font-weight: 800; }
   #page-stats .rate-table td { color: #0f172a; font-weight: 600; }
   #page-stats .rate-table tr.inc td:first-child { font-weight: 800; }

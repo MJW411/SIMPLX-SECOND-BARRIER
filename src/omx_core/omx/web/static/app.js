@@ -269,6 +269,15 @@ function render() {
   const h = st.helmet;
   tag("#helmetTag", !h ? "꺼짐" : st.door_wanted ? "문 열림" : "닫힘", !h ? "" : st.door_wanted ? "ok" : "");
   tag("#ovHelmetTag", !h ? "꺼짐" : st.door_wanted ? "문 열림" : "닫힘", !h ? "" : st.door_wanted ? "ok" : "");
+  // 출입문 상태 크게 (2026-10-12 사용자): 실제 문 위치(아두이노 보고) 기준, 화재로 열렸으면 주황
+  const gOpen = S.devices ? !!S.devices.door_open : !!st.door_wanted, gFire = !!sf.fire;
+  const gLeft = h && st.door_wanted && !gFire ? Math.max(h.open_left || 0, st.manual_left || 0) : 0;
+  const gSub = gFire ? "화재 — 대피용으로 열어 둠" : gOpen ? (gLeft > 0 ? `닫힘까지 ${fx(gLeft, 1)}초` : "출입문 열림")
+    : h ? "헬멧을 쓴 사람이 보이면 열림" : "출입문 닫힘";
+  const gHtml = `<b>GATE ${gOpen ? "OPEN" : "CLOSED"}</b><span>${gSub}</span>`;
+  const gEl = $("#ovGate");
+  if (gEl.dataset.h !== gHtml) { gEl.innerHTML = gHtml; gEl.dataset.h = gHtml; }
+  gEl.className = "gate-badge " + (gFire && gOpen ? "fire" : gOpen ? "open" : "closed");
   kv("#ovHelmetKv", h ? { "판정": esc(h.state), "검출": h.detections.length ? esc(h.detections.map((x) => `${x.name} ${Math.round(x.conf * 100)}%`).join(", ")) : "—" }
     : { "판정": "헬멧 게이트 꺼짐" });
   kv("#helmetKv", h ? { "판정": esc(h.state), "검출": h.detections.length ? esc(h.detections.map((x) => `${x.name} ${Math.round(x.conf * 100)}%`).join(", ")) : "—",
