@@ -521,6 +521,10 @@
     <p class="done-msg">삭제된 자세를 쓰는 단계가 있습니다</p><ul id="poseMissing" class="pose-missing"></ul>
     <p class="hint">이대로 실행하면 그 단계에서 작업이 멈춥니다. 단계를 눌러 목표 자세를 바꾸거나 단계를 지운 뒤 <b>저장</b>하세요.</p>
     <div class="btn-row"><button class="btn primary big" id="poseGo">프로그램에서 고치기</button><button class="btn ghost" id="poseLater">닫기</button></div></div></div>
+  <div id="fallModal" class="modal hidden"><div class="modal-card done-card fall-card"><div class="card-h"><h3>낙상 감지</h3><span class="tag bad" id="fallTime"></span></div>
+    <p class="done-msg">작업자 낙상이 감지되었습니다</p><p id="fallMsg" class="conv-msg"></p>
+    <p class="hint">넘어진 사람이 3초 넘게 계속 보였습니다. 현장을 확인하세요. 사고 순간 영상은 영상 탭에 저장됩니다.</p>
+    <div class="btn-row"><button class="btn primary big" id="fallOk">확인</button><button class="btn ghost" id="fallVideo">영상 보기</button></div></div></div>
   <div id="convModal" class="modal hidden"><div class="modal-card done-card conv-card"><div class="card-h"><h3>공정 이상</h3><span class="tag bad">컨베이어</span></div>
     <p class="done-msg">컨베이어 공정 이상</p><p id="convMsg" class="conv-msg"></p>
     <p class="hint">물품을 확인·정리한 뒤 <b>재가동</b>을 누르면 컨베이어와 로봇 작업이 멈춘 곳부터 다시 이어서 실행됩니다.</p>

@@ -65,7 +65,9 @@ safety:
   vanish_min_frames: 6     # 연속 N 프레임 이상 보인 사람만 사라짐 대상 (깜박이는 오검출 제외, 30fps 에서 0.2초)
   vanish_match_radius: 0.15  # 직전-현재 검출 1:1 매칭 반경 (m)
   vanish_match_iou: 0.3      # 또는 박스가 이만큼 겹치면 같은 사람 (넘어질 때 몸 중심이 크게 움직여도)
-  fall_confirm_frames: 10    # 넘어진 사람이 연속 N 프레임 보이면 낙상 알림·녹화 (30fps 에서 0.33초). 정지는 하지 않음
+  fall_confirm_sec: 3.0      # 넘어진 사람이 이 시간 넘게 계속 보이면 낙상 알림·녹화 + 제어판 확인 팝업. 정지는 하지 않음
+  fall_min_conf: 0.60        # 낙상으로 셀 최소 확신도 (2026-10-12 사용자: 60% 이상 3초 이상)
+  fall_gap_sec: 0.5          # 이만큼 이하로 잠깐 놓친 건 계속 보인 것으로 (인식 깜빡임)
   fall_clear_frames: 30      # 넘어진 사람이 N 프레임 안 보이면 낙상 상태 해제
   exit_border_px: 40       # 화면 가장자리 이 폭 안에서 사라지면 출구로 본다
   door_roi_px: null        # [x1,y1,x2,y2] 출입문 영역 (이미지 좌표)

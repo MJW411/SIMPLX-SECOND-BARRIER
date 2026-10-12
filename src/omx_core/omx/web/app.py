@@ -747,6 +747,8 @@ def create_app(ctx):
             layer, tags = img.copy(), []
             for p in pc.persons:
                 col = (0, 0, 255) if p.dist < sm.profile()["stop"] else (0, 170, 255) if p.dist < sm.profile()["slow"] else (0, 200, 0)
+                if getattr(p, "fallen", False):
+                    col = (180, 105, 255)          # 넘어진 사람: 분홍
                 x1, y1 = int(p.box[0]), int(p.box[1])
                 if p.poly is not None:
                     cv2.fillPoly(layer, [p.poly], col)

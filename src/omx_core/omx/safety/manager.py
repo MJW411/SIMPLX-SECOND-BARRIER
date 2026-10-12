@@ -58,6 +58,8 @@ class SafetyManager:
         self.fallen = False                # 낙상 확정 상태 (알림·녹화만, 정지 판단에는 쓰지 않음)
         self._fall_n = 0
         self._fall_clear_n = 0
+        self._fall_t0 = None               # 넘어진 사람(확신도 기준 이상)이 처음 보인 시각
+        self._fall_last = None             # 마지막으로 보인 시각
         self._fire_retry_t = 0.0
         self._run = True
         self.thread = threading.Thread(target=self._loop, name="safety", daemon=True)
@@ -301,18 +303,27 @@ class SafetyManager:
                 self._latch(f"사람 근접으로 정지 ({d:.2f} m)", "human_stop")
 
     def _judge_fall(self, pc, s):
-        """낙상: 넘어진 사람이 연속 N프레임 보이면 알림·녹화(한 번). 정지는 걸지 않는다 —
-        넘어진 사람도 사람이므로 구역 안이면 거리 판정으로 똑같이 감속·정지된다 (2026-10-08 사용자 결정)."""
-        if any(getattr(p, "fallen", False) for p in pc.persons):
+        """낙상: 넘어진 사람이 확신도 fall_min_conf 이상으로 fall_confirm_sec 넘게 계속 보이면 알림·녹화(한 번)
+        → 제어판에 확인 팝업 (2026-10-12 사용자: 60% 이상 3초). 잠깐(fall_gap_sec 이하) 놓친 프레임은 이어진 것으로 본다.
+        정지는 걸지 않는다 — 넘어진 사람도 사람이므로 구역 안이면 거리 판정으로 똑같이 감속·정지된다 (2026-10-08 사용자 결정)."""
+        min_conf = s.get("fall_min_conf", 0.60)
+        seen = [p for p in pc.persons if getattr(p, "fallen", False) and getattr(p, "conf", 1.0) >= min_conf]
+        if seen:
+            t = pc.t
+            if self._fall_t0 is None or t - (self._fall_last or t) > s.get("fall_gap_sec", 0.5):
+                self._fall_t0 = t
+            self._fall_last = t
             self._fall_n += 1
             self._fall_clear_n = 0
-            if not self.fallen and self._fall_n >= s.get("fall_confirm_frames", 10):
+            if not self.fallen and t - self._fall_t0 >= s.get("fall_confirm_sec", 3.0):
                 self.fallen = True
                 inz = any(getattr(p, "fallen", False) and p.in_zone for p in pc.persons)
                 self.events.emit("person_fall", "작업자 낙상 감지" + (" (감시 구역 안)" if inz else ""),
                                  level="alarm", clip=True)
         else:
             self._fall_n = 0
+            if self._fall_last is not None and pc.t - self._fall_last > s.get("fall_gap_sec", 0.5):
+                self._fall_t0 = None                    # 끊겼다 → 다시 처음부터 3초를 센다
             self._fall_clear_n += 1
             if self.fallen and self._fall_clear_n >= s.get("fall_clear_frames", 30):
                 self.fallen = False
