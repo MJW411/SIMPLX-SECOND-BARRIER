@@ -398,6 +398,31 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .rbar { height: 10px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
 .rbar span { display: block; height: 100%; background: #9aa6b8; border-radius: 2px; }
 @media (max-width: 1280px) { .st-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .st-kpis .kpi:nth-child(n+4) { border-top: 1px solid var(--line); } .st-kpis .kpi:nth-child(3) { border-right: 0; } }
+/* 로봇·작업: 왼쪽 로봇 제어·관절 / 가운데 프로그램 / 오른쪽 실행·단계 편집. 넓은 화면에서는 한 화면에 꽉 차고 긴 목록은 칸 안에서 스크롤 */
+.rw-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.rw-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.kv.kv-2 { grid-template-columns: max-content 1fr max-content 1fr; }
+.rw-foot { border-top: 1px solid var(--line); margin-top: 12px; }
+@media (max-width: 1100px) { .rw-grid { grid-template-columns: 1fr; } .kv.kv-2 { grid-template-columns: max-content 1fr; } }
+@media (min-width: 1101px) and (min-height: 640px) {
+  body[data-page="robot"] .app { height: 100vh; min-height: 0; }
+  body[data-page="robot"] .content { display: flex; flex-direction: column; min-height: 0; padding-bottom: 18px; }
+  body[data-page="robot"] #page-robot { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #page-robot .rw-grid { flex: 1; min-height: 0; align-items: stretch; }
+  #page-robot .rw-col { min-height: 0; }
+  #page-robot .rw-fill { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+  #page-robot .rw-scroll { flex: 1 1 0; min-height: 0; overflow: auto; }
+  #page-robot .joints { gap: 8px; }
+  #page-robot .tcp { margin-top: 12px; }
+  body[data-page="robot"] .content { overflow: auto; }   /* 정말 모자랄 때만 스크롤 */
+  #page-robot .rw-col:last-child .rw-fill { min-height: 240px; }
+  #page-robot .rw-col:nth-child(2) .rw-fill { min-height: 360px; }
+  #page-robot .btn-row .btn.big { flex: 1 1 0; padding-left: 8px; padding-right: 8px; white-space: nowrap; }
+}
+@media (min-width: 1101px) and (max-height: 920px) {
+  #page-robot .hint { display: none; }
+  #page-robot .rw-foot .btn-row .btn { padding-top: 6px; padding-bottom: 6px; }
+}
 /* 통계: 넓은 화면에서는 스크롤 없이 한 화면에 꽉 차게 (위 줄 = 일별 작업량·사고 유형, 아래 줄 = 이벤트 발생률·시간대별) */
 @media (min-width: 1101px) and (min-height: 640px) {
   body[data-page="stats"] .app { height: 100vh; min-height: 0; }

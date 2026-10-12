@@ -103,77 +103,62 @@
 
     <!-- ============ Robot · Program (로봇·작업) ============ -->
     <section class="page hidden" id="page-robot">
-      <div class="grid-2">
-        <div class="stack">
+      <div class="rw-grid">
+        <div class="rw-col">
           <div class="card">
-            <div class="card-h"><h3>전원</h3><span id="torqueTag" class="tag"></span></div>
+            <div class="card-h"><h3>로봇 제어</h3><span id="torqueTag" class="tag"></span></div>
             <div class="btn-row">
               <button class="btn ok" id="btnTorqueOn"><svg><use href="#i-power"/></svg>토크 켜기</button>
-              <button class="btn" id="btnPark">접고 토크 끄기</button>
+              <button class="btn" id="btnPark" title="팔을 접힌 휴식 자세로 옮긴 뒤 토크를 끄고, 팔이 처지지 않는지 확인합니다">접고 토크 끄기</button>
               <button class="btn ghost" id="btnTorqueOff">토크 끄기</button>
             </div>
-            <p class="hint">"접고 토크 끄기"는 팔을 접힌 휴식 자세로 옮긴 뒤 토크를 끄고, 팔이 처지지 않는지 확인합니다.</p>
-          </div>
-          <div class="card">
-            <div class="card-h"><h3>동작</h3></div>
             <div class="btn-row">
               <button class="btn" id="btnHome"><svg><use href="#i-home"/></svg>홈으로</button>
               <button class="btn" id="btnStop"><svg><use href="#i-stop"/></svg>동작 정지</button>
               <button class="btn" id="btnReset">고장·비상정지 해제</button>
             </div>
             <label class="slider">속도 <input type="range" id="speed" min="1" max="20" step="1"><b id="speedTxt"></b><span class="muted small">최대 <span id="speedCap"></span></span></label>
-            <dl class="kv" id="motionKv"></dl>
+            <dl class="kv kv-2" id="motionKv"></dl>
+          </div>
+          <div class="card rw-fill">
+            <div class="card-h"><h3>관절</h3><span class="muted small">엔코더 실측값 · 위치는 FK로 계산</span></div>
+            <div class="rw-scroll">
+              <div id="jointList" class="joints"></div>
+              <div class="tcp" id="tcpBig"></div>
+            </div>
           </div>
         </div>
-        <div class="card">
-          <div class="card-h"><h3>관절</h3><span class="muted small">엔코더 실측값 · 위치는 FK로 계산</span></div>
-          <div id="jointList" class="joints"></div>
-          <div class="tcp" id="tcpBig"></div>
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-h"><h3>프로그램</h3><span class="tag warn hidden" id="seqDirty">저장 안 됨</span></div>
-          <ol id="seqList" class="seq prog"></ol>
-          <div class="inline-form">
-            <select id="stepType">
-              <option value="move">관절 이동 (MoveJ)</option><option value="linear">직선 이동 (MoveL)</option>
-              <option value="home">홈 이동</option>
-              <option value="grip_open">그리퍼 열기</option><option value="grip_close">그리퍼 닫기</option>
-              <option value="grip">그리퍼 (저장 동작·열림 %)</option>
-              <option value="pause">시간 대기</option><option value="wait_sensor2">센서 대기 (D5)</option>
-              <option value="conveyor">컨베이어</option>
-            </select>
-            <button class="btn" id="btnAddStep">+ 추가</button>
-          </div>
-          <div class="btn-row">
-            <button class="btn ghost" data-quick="grip_open">+ 그리퍼 열기</button>
-            <button class="btn ghost" data-quick="grip_close">+ 그리퍼 닫기</button>
-            <button class="btn ghost" data-quick="wait_sensor2">+ 센서 대기 (D5)</button>
-          </div>
-          <p class="hint">새 단계는 선택한 단계 바로 다음에 들어갑니다. 단계를 누르면 오른쪽에서 편집합니다.</p>
-          <div class="btn-row">
-            <button class="btn primary" id="btnSeqSave">저장</button>
-            <button class="btn" id="btnSeqTemplate">픽앤플레이스 템플릿</button>
-            <button class="btn ghost" id="btnSeqClear">비우기</button>
-          </div>
-        </div>
-        <div class="stack">
-          <div class="card">
-            <div class="card-h"><h3 id="edTitle">단계 편집</h3>
-              <div class="btn-row tight">
-                <button class="btn ghost" id="btnStepUp" title="위로">↑</button>
-                <button class="btn ghost" id="btnStepDown" title="아래로">↓</button>
-                <button class="btn ghost" id="btnStepDup">복제</button>
-                <button class="btn ghost" id="btnStepDel">삭제</button>
+        <div class="rw-col">
+          <div class="card rw-fill">
+            <div class="card-h"><h3>프로그램</h3><span class="tag warn hidden" id="seqDirty">저장 안 됨</span></div>
+            <div class="rw-scroll"><ol id="seqList" class="seq prog"></ol></div>
+            <div class="rw-foot">
+              <div class="inline-form">
+                <select id="stepType">
+                  <option value="move">관절 이동 (MoveJ)</option><option value="linear">직선 이동 (MoveL)</option>
+                  <option value="home">홈 이동</option>
+                  <option value="grip_open">그리퍼 열기</option><option value="grip_close">그리퍼 닫기</option>
+                  <option value="grip">그리퍼 (저장 동작·열림 %)</option>
+                  <option value="pause">시간 대기</option><option value="wait_sensor2">센서 대기 (D5)</option>
+                  <option value="conveyor">컨베이어</option>
+                </select>
+                <button class="btn" id="btnAddStep">+ 추가</button>
+              </div>
+              <div class="btn-row">
+                <button class="btn ghost" data-quick="grip_open">+ 그리퍼 열기</button>
+                <button class="btn ghost" data-quick="grip_close">+ 그리퍼 닫기</button>
+                <button class="btn ghost" data-quick="wait_sensor2">+ 센서 대기 (D5)</button>
+              </div>
+              <p class="hint">새 단계는 선택한 단계 바로 다음에 들어갑니다. 단계를 누르면 오른쪽에서 편집합니다.</p>
+              <div class="btn-row">
+                <button class="btn primary" id="btnSeqSave">저장</button>
+                <button class="btn" id="btnSeqTemplate">픽앤플레이스 템플릿</button>
+                <button class="btn ghost" id="btnSeqClear">비우기</button>
               </div>
             </div>
-            <div id="stepEditor" class="step-editor"></div>
-            <div class="btn-row">
-              <button class="btn" id="btnStepRun"><svg><use href="#i-play"/></svg>이 단계만 실행</button>
-              <button class="btn" id="btnRunFrom"><svg><use href="#i-play"/></svg>이 단계부터 1회</button>
-            </div>
           </div>
+        </div>
+        <div class="rw-col">
           <div class="card">
             <div class="card-h"><h3>실행</h3><span id="cycleTag" class="tag"></span></div>
             <label class="field"><span>반복 횟수 (0 = 정지할 때까지)</span><input type="number" id="cycleCount" min="0" max="9999" step="1" value="3"></label>
@@ -184,7 +169,22 @@
             </div>
             <label class="switch"><input type="checkbox" id="gripCheck"><span></span>집기 실패 감지</label>
             <dl class="kv" id="cycleKv"></dl>
-            <p class="hint">실행 버튼은 저장 안 된 변경이 있으면 먼저 저장합니다. 한 번 실행은 몇 분으로 제한됩니다(safety_limits.yaml).</p>
+            <p class="hint">저장 안 된 변경은 실행할 때 먼저 저장합니다. 한 번 실행은 몇 분으로 제한됩니다.</p>
+          </div>
+          <div class="card rw-fill">
+            <div class="card-h"><h3 id="edTitle">단계 편집</h3>
+              <div class="btn-row tight">
+                <button class="btn ghost" id="btnStepUp" title="위로">↑</button>
+                <button class="btn ghost" id="btnStepDown" title="아래로">↓</button>
+                <button class="btn ghost" id="btnStepDup">복제</button>
+                <button class="btn ghost" id="btnStepDel">삭제</button>
+              </div>
+            </div>
+            <div class="rw-scroll"><div id="stepEditor" class="step-editor"></div></div>
+            <div class="btn-row">
+              <button class="btn" id="btnStepRun"><svg><use href="#i-play"/></svg>이 단계만 실행</button>
+              <button class="btn" id="btnRunFrom"><svg><use href="#i-play"/></svg>이 단계부터 1회</button>
+            </div>
           </div>
         </div>
       </div>
