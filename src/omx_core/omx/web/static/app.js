@@ -187,7 +187,11 @@ function render() {
   $("#btnRestart").disabled = !sf.stop_latched;
   $("#topRestart").classList.toggle("hidden", !sf.stop_latched || sf.fire);
   $("#btnFireEnd").classList.toggle("hidden", !sf.fire);
-  $("#btnConvClear").disabled = !sf.conveyor_alarm;
+  // 공정 이상(컨베이어) 팝업: 이상이 생기면 띄우고, 풀리면(재가동·물품 도착 등) 닫는다. '닫기'는 이번 이상 동안만 숨김
+  if (sf.conveyor_alarm) {
+    $("#convMsg").textContent = sf.conveyor_alarm;
+    if (convHidden !== sf.conveyor_alarm) $("#convModal").classList.remove("hidden");
+  } else { $("#convModal").classList.add("hidden"); convHidden = ""; }
   drawGauge($("#distGauge"), sf.thresholds, sf.min_dist, sf.zone);
   if (page === "overview") drawZoneMap($("#zoneMap"), S.map, sf.thresholds);
   kv("#safetyKv", {
@@ -550,7 +554,9 @@ setInterval(() => {
     if (b) { const u = URL.createObjectURL(b); const old = img.src; img.src = u; if (old.startsWith("blob:")) URL.revokeObjectURL(old); }
   }).catch(() => {}).finally(() => { delete img.dataset.busy; });
 }, 500);
-on("#btnConvClear", () => api("/api/safety/conveyor_clear"));
+let convHidden = "";
+on("#convRestart", () => api("/api/safety/conveyor_clear").then(() => { $("#convModal").classList.add("hidden"); toast("재가동했습니다", "ok"); }).catch(() => {}));
+on("#convLater", () => { convHidden = $("#convMsg").textContent; $("#convModal").classList.add("hidden"); });
 
 // settings
 function thrPreview() {                         // 입력칸 값으로 거리 기준 막대 미리 보기 (저장 전에도)
