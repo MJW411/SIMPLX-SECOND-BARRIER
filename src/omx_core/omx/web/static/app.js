@@ -132,7 +132,7 @@ function onEvent(ev) {
     if (window.Notification && Notification.permission === "granted") {
       navigator.serviceWorker?.getRegistration().then((reg) => {
         const opt = { body: ev.message, tag: "omx-" + ev.id, icon: "/static/icon-192.png" };
-        reg ? reg.showNotification("OMX 안전 경보", opt) : new Notification("OMX 안전 경보", opt);
+        reg ? reg.showNotification("안전 경보", opt) : new Notification("안전 경보", opt);
       });
     }
   }
