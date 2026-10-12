@@ -256,6 +256,7 @@ function render() {
   setIfIdle("#gripPct", gp ?? 0);
   if (document.activeElement !== $("#gripPct")) $("#gripPctTxt").textContent = `${$("#gripPct").value}%`;
   renderSeq();
+  checkMissingPoses();
   $("#gripCheck").checked = S.cycle.grip_check;
 
   // program
@@ -369,7 +370,8 @@ function renderSeq() {
   const cy = S?.cycle, cur = cy?.running && cy.step >= 0 ? (cy.section === "before" ? cy.step : bsCount + cy.step) : -1;
   const all = seqDraft || [];
   if (selIdx >= all.length) selIdx = all.length - 1;
-  const li = (s, i) => `<li data-i="${i}" class="t-${s.type} ${cur === i ? "current" : ""} ${selIdx === i ? "sel" : ""}"><span class="lbl">${stepLabel(s)}</span>` +
+  const gone = (s) => (s.type === "move" || s.type === "linear") && s.pose && !(s.pose in (S?.teach.poses || {}));
+  const li = (s, i) => `<li data-i="${i}" class="t-${s.type} ${cur === i ? "current" : ""} ${selIdx === i ? "sel" : ""} ${gone(s) ? "missing" : ""}"><span class="lbl">${stepLabel(s)}</span>` +
     `<span class="arg">${esc(stepArg(s))}</span></li>`;
   const put = (el, html) => { if (el.dataset.h !== html) { el.innerHTML = html; el.dataset.h = html; } };
   put($("#seqBefore"), bsCount ? all.slice(0, bsCount).map((s, i) => li(s, i)).join("")
@@ -422,6 +424,23 @@ function renderEditor() {
   $("#stepEditor").innerHTML = h;
 }
 function edited() { seqDirty = true; renderSeq(); }
+// 자세 목록에서 지워진 자세를 프로그램이 쓰고 있으면 안내 팝업 (2026-10-12 사용자). 같은 목록은 한 번만 띄운다.
+let poseMissingShown = "", poseMissingFirst = -1;
+function missingPoseSteps() {
+  const poses = S?.teach.poses || {}, all = seqDraft || [];
+  return all.map((s, i) => ({ s, i })).filter(({ s }) => (s.type === "move" || s.type === "linear") && s.pose && !(s.pose in poses))
+    .map(({ s, i }) => { const r = selRef(i); return { i, pose: s.pose, where: `${r.section === "before" ? "시작 전 " : ""}${r.index + 1}단계 (${stepLabel(s)})` }; });
+}
+function checkMissingPoses() {
+  const miss = missingPoseSteps(), key = miss.map((m) => `${m.where}:${m.pose}`).join("|");
+  if (!miss.length) { poseMissingShown = ""; $("#poseModal").classList.add("hidden"); return; }
+  if (key === poseMissingShown) return;
+  poseMissingShown = key; poseMissingFirst = miss[0].i;
+  $("#poseMissing").innerHTML = miss.map((m) => `<li><b>${esc(m.where)}</b> — 없는 자세 <code>${esc(m.pose)}</code></li>`).join("");
+  $("#poseModal").classList.remove("hidden");
+}
+on("#poseGo", () => { $("#poseModal").classList.add("hidden"); go("robot"); selIdx = poseMissingFirst; addSec = selRef().section; edKey = ""; renderSeq(); });
+on("#poseLater", () => $("#poseModal").classList.add("hidden"));
 $("#stepEditor").addEventListener("input", (e) => {
   const f = e.target.dataset.f, s = seqDraft?.[selIdx]; if (!f || !s) return;
   s[f] = e.target.type === "range" || e.target.type === "number" ? +e.target.value : e.target.value;

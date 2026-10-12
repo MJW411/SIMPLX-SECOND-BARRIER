@@ -244,6 +244,10 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .seq li::before { content: counter(s); width: 22px; height: 22px; border-radius: 3px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
   display: grid; place-items: center; font: 700 11px var(--mono); flex: none; }
 .seq li.current { border-color: var(--ok); box-shadow: inset 3px 0 0 var(--ok); }
+.seq li.missing { border-color: var(--danger); background: var(--danger-bg); box-shadow: inset 3px 0 0 var(--danger); }
+.seq li.missing .arg::after { content: " (삭제된 자세)"; color: var(--danger); font-weight: 700; }
+.pose-card .done-msg { color: #9a3412; }
+.pose-missing { text-align: left; margin: 6px 0 4px; padding-left: 20px; font-size: 14px; line-height: 1.7; }
 .seq li .arg { color: var(--muted); } .seq li .sp { margin-left: auto; display: flex; gap: 4px; }
 .seq li button { background: var(--panel); border: 1px solid var(--line-2); color: var(--muted); border-radius: 3px; padding: 2px 8px; cursor: pointer; }
 .seq-empty { color: var(--muted); padding: 14px; text-align: center; border: 1px dashed var(--line-2); border-radius: 4px; }
