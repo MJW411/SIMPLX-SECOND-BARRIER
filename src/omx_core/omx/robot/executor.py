@@ -275,6 +275,29 @@ class Executor:
             q[5] = min(max(q[5], self.qmin[5]), self.qmax[5])   # 그리퍼는 한계 안으로
             return q
 
+    # 저장된 자세의 각도 보정 허용치: 한계를 이만큼(rad)만 넘은 값은 한계로 당긴다
+    FIT_TOL = 0.05
+
+    def fit_q(self, q):
+        """저장된 자세를 움직일 수 있는 값으로 고친다 (2026-10-12: 화재 홈 복귀가 저장된 HOME 때문에 늘 거부됨).
+        - 엔코더가 한 바퀴 넘겨 읽힌 각도(예: 손목 5.91 = -0.37 + 2π)는 한계 안의 같은 방향으로 되돌린다.
+        - 한계를 FIT_TOL 이하로 살짝 넘은 값(예: 어깨 -1.549, 한계 -1.53)은 한계로 당긴다.
+        그 밖(진짜로 한계 밖)은 그대로 둬서 check_q 가 거부하게 한다."""
+        q = np.asarray(q, float).copy()
+        for i in range(5):
+            lo, hi = self.qmin[i], self.qmax[i]
+            if not lo <= q[i] <= hi:
+                for k in (-1, 1):
+                    w = q[i] + k * 2 * np.pi
+                    if lo - self.FIT_TOL <= w <= hi + self.FIT_TOL:
+                        q[i] = w
+                        break
+            if lo - self.FIT_TOL <= q[i] < lo:
+                q[i] = lo
+            elif hi < q[i] <= hi + self.FIT_TOL:
+                q[i] = hi
+        return q
+
     # ---- 검사 ----
     def check_q(self, q, q_from=None):
         """q_from 이 주어지면, 이미 한계 밖에 있던 관절은 한계 쪽으로 돌아오는(나빠지지 않는) 움직임을 허용한다
@@ -322,7 +345,7 @@ class Executor:
         with self.lock:
             self._require_ready()
             q0 = self.current_q()
-            q1 = np.asarray(q_target, float).copy()
+            q1 = self.fit_q(q_target)
             self.check_q(q1)
             # 관절 보간 경로 중간점도 검사 (팔이 작업대를 스치지 않게)
             n = max(2, int(np.abs(q1 - q0).max() / 0.05) + 1)

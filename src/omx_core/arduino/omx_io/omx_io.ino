@@ -47,8 +47,8 @@ const int BRIGHTNESS = 80;
 const int GUIDE_PIXELS = 60;
 const float GUIDE_MAX = 0.80;                 // 물결 최대 밝기 비율 (시험 스케치 0.35 → 0.80, 2026-10-08 사용자: 더 밝게)
 const float GUIDE_WHITE = 0.20;               // 평상시 백색 밝기 비율 (은은하게)
-const float SPACING = 10.0;                   // 빛 덩어리 간격 (LED 개수). 시험 스케치 20 → 6 (2026-10-08) → 10 (2026-10-12 꼬리 늘리며)
-const float TAIL = 8.5;                       // 꼬리 길이 (SPACING 보다 작게). 5 → 8.5 (2026-10-12 사용자: 꼬리 더 길게)
+const float SPACING = 7.0;                    // 빛 덩어리 간격 (LED 개수). 시험 스케치 20 → 6 (2026-10-08) → 7 (2026-10-12 사용자: 간격 좁게)
+const float TAIL = 11.0;                      // 꼬리 길이. SPACING 보다 길면 앞 덩어리 꼬리와 겹친다(밝은 쪽을 씀). 5 → 11 (2026-10-12 사용자: 꼬리 길게)
 const float HEAD_SOFT = 1.5;                  // 머리 앞쪽 번짐
 const float SPEED = 6.0;                      // 초당 이동 칸 수
 const float BASE_GLOW = 0.04;                 // 바닥 은은한 빛
@@ -153,7 +153,10 @@ void drawWave() {
     float d = fmod(phase - i, SPACING);
     if (d < 0) d += SPACING;
     float b = 0;
-    if (d <= TAIL) { float t = 1.0 - d / TAIL; b = t * t; }
+    for (float dk = d; dk <= TAIL; dk += SPACING) {   // 이 칸에 닿는 꼬리들 (가까운 머리부터) 중 가장 밝은 값
+      float t = 1.0 - dk / TAIL;
+      if (t * t > b) b = t * t;
+    }
     float ahead = SPACING - d;
     if (ahead < HEAD_SOFT) { float f = 1.0 - ahead / HEAD_SOFT; if (f * f > b) b = f * f; }
     if (b < BASE_GLOW) b = BASE_GLOW;
