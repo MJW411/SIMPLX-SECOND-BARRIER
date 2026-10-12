@@ -565,10 +565,10 @@ $$(".tile[data-dev]").forEach((el) => el.addEventListener("click", () => {
 }));
 on("#btnDoorOpen", () => api("/api/devices/door_open").then(() => toast("출입문을 열었습니다", "ok")).catch(() => {}));
 on("#btnDoorClose", async () => { await api("/api/settings/door", { close_sec: +$("#doorClose").value }); toast("저장했습니다", "ok"); });
-// 입구 카메라: 입출력·모니터링 화면을 보고 있을 때만 0.5초마다 한 장씩 받는다
+// 입구 카메라: 모니터링 화면을 보고 있을 때만 0.5초마다 한 장씩 받는다
 setInterval(() => {
-  if ((page !== "io" && page !== "overview") || document.hidden || !S?.site?.helmet) return;
-  const img = $(page === "io" ? "#helmetImg" : "#ovHelmetImg");
+  if (page !== "overview" || document.hidden || !S?.site?.helmet) return;
+  const img = $("#ovHelmetImg");
   if (img.dataset.busy) return;
   img.dataset.busy = "1";
   fetch("/api/helmet/frame.jpg", { cache: "no-store" }).then((r) => r.ok ? r.blob() : null).then((b) => {
