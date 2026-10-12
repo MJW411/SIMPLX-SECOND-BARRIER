@@ -186,6 +186,10 @@ input[type=file] { padding: 6px; }
 .pill-home { font-size: 11px; color: var(--accent); background: var(--accent-soft); border: 1px solid #b9cbe6; border-radius: 3px; padding: 0 6px; font-weight: 700; }
 
 /* ---------- KPIs & joints ---------- */
+/* 모니터링: 왼쪽(카메라 + 숫자 칸)과 오른쪽(안전 + 입구 카메라) 열의 끝선을 맞춘다 — 숫자 칸이 남는 높이만큼 늘어남 (2026-10-12 사용자) */
+#page-overview > .grid-2 { align-items: stretch; }
+#page-overview > .grid-2 > .stack:first-child #kpis { flex: 1 1 auto; grid-auto-rows: 1fr; }
+#page-overview #kpis .kpi { display: flex; flex-direction: column; justify-content: center; }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
 .kpi { padding: 12px 16px; border-right: 1px solid var(--line); }
 .kpi:last-child { border-right: 0; }
