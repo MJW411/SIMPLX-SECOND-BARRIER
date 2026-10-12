@@ -167,6 +167,8 @@ class PerceptionNode(OmxNode):
             layer = img.copy()
             for p in pc.persons:
                 col = (0, 0, 255) if p.dist < prof["stop"] else (0, 170, 255) if p.dist < prof["slow"] else (0, 200, 0)
+                if p.fallen:
+                    col = (180, 105, 255)          # 넘어진 사람: 분홍 마스크 (2026-10-12 사용자)
                 x1, y1, x2, y2 = map(int, p.box)
                 if p.poly is not None:
                     cv2.fillPoly(layer, [p.poly], col)

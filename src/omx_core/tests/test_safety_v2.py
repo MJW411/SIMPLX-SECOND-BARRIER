@@ -37,8 +37,8 @@ seq = [0]
 STOP = sm.profile()["stop"]
 
 
-def person(dist, fallen=False, in_zone=True, x=320):
-    return Person(box=(x - 20, 200, x + 20, 300), conf=0.9, px=(x, 250), pos=np.array([0.3, 0.0, 0.0]),
+def person(dist, fallen=False, in_zone=True, x=320, conf=0.9):
+    return Person(box=(x - 20, 200, x + 20, 300), conf=conf, px=(x, 250), pos=np.array([0.3, 0.0, 0.0]),
                   dist=dist, cam_dist=dist, in_zone=in_zone, name="fall-down" if fallen else "human", fallen=fallen)
 
 
@@ -82,14 +82,29 @@ sm.restart()
 print("[낙상: 알림만, 정지는 거리로]")
 emitted.clear()
 far = STOP * 20
-feed([person(far, fallen=True)], n=C["safety"]["fall_confirm_frames"] + 2)
-check("person_fall" in emitted, "넘어진 사람이 계속 보이면 낙상 이벤트")
+t0 = time.monotonic()
+for k in range(80):                                   # 30fps 로 2.6초
+    feed([person(far, fallen=True)], t=t0 + k / 30)
+check("person_fall" not in emitted, "3초 전에는 낙상 알림 없음")
+for k in range(80, 100):                              # 3초 넘김
+    feed([person(far, fallen=True)], t=t0 + k / 30)
+check("person_fall" in emitted, "넘어진 사람(확신도 60% 이상)이 3초 넘게 보이면 낙상 이벤트")
 check(not sm.stop_latched and sm.state in ("NORMAL", "SLOW"), f"구역 밖·먼 낙상만으로는 정지하지 않음 ({sm.state})")
 check(emitted.count("person_fall") == 1, "낙상 이벤트는 한 번만")
 feed([person(STOP * 0.5, fallen=True)], n=4)
 check(sm.state == "STOP" and sm.stop_latched.startswith("사람 근접"), f"넘어진 사람이 정지 거리 안 → 정지 ({sm.stop_latched})")
 feed(n=40)
 check(not sm.fallen, "넘어진 사람이 안 보이면 낙상 상태 해제")
+emitted.clear()
+t1 = time.monotonic() + 100
+for k in range(150):                                  # 5초, 확신도 55%
+    feed([person(far, fallen=True, conf=0.55)], t=t1 + k / 30)
+check("person_fall" not in emitted, "확신도 60% 미만이면 오래 보여도 낙상 아님")
+t2 = t1 + 10
+for k in range(150):                                  # 5초 동안 1.5초마다 끊김 (1초 보이고 0.5초 넘게 안 보임)
+    feed([person(far, fallen=True)] if (k % 45) < 30 else [], t=t2 + k / 30)
+check("person_fall" not in emitted, "보였다 끊겼다 하면(0.5초 넘게 끊김) 3초를 처음부터 다시 셈")
+feed(n=40, t=t2 + 6)
 
 print("[재가동: 근접 판정 해제 전에는 안 됨]")
 check(len(sm.vanish.pending) + len(sm.vanish.unresolved) > 0, "출구가 아닌 곳에서 사라진 사람 → 사라짐 판정 (설계대로)")

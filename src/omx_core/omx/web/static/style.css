@@ -338,7 +338,8 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .modal-card video { width: 100%; border-radius: 4px; background: #000; }
 .done-card { width: min(420px, 100%); text-align: center; }
 .done-msg { font-size: 20px; font-weight: 700; margin: 18px 0 6px; }
-.conv-card .done-msg { color: var(--danger); } .conv-msg { margin: 0 0 4px; color: #394559; }
+.conv-card .done-msg { color: var(--danger); }
+.fall-card .done-msg { color: #be185d; } .fall-card .card-h .tag.bad { font-family: var(--mono); } .conv-msg { margin: 0 0 4px; color: #394559; }
 .toasts { position: fixed; right: 18px; top: 160px; display: flex; flex-direction: column; gap: 8px; z-index: 70; max-width: min(420px, calc(100vw - 32px)); }
 .toast { background: var(--panel); border: 1px solid var(--line-2); border-left: 4px solid var(--accent); padding: 10px 14px; border-radius: 4px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, .15); font-size: 13.5px; animation: slide .18s ease-out; }

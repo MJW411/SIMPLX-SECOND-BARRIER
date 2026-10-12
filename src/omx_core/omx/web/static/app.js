@@ -130,6 +130,14 @@ function connectWS() {
   };
 }
 function onEvent(ev) {
+  if (ev.type === "person_fall") {               // 낙상(확신도 60% 이상 3초) → 확인 팝업, 확인을 누르면 그 이벤트도 확인 처리
+    fallEventId = ev.id;
+    $("#fallMsg").textContent = ev.message;
+    const ft = new Date((ev.t || Date.now() / 1000) * 1000), p2 = (n) => String(n).padStart(2, "0");
+    $("#fallTime").textContent = `${p2(ft.getHours())}:${p2(ft.getMinutes())}:${p2(ft.getSeconds())}`;
+    if (S?.fall) $("#fallHint").textContent = `넘어진 사람이 확신도 ${Math.round(S.fall.conf * 100)}% 이상으로 ${S.fall.sec}초 넘게 계속 보였습니다. 현장을 확인하세요. 사고 순간 영상은 영상 탭에 저장됩니다.`;
+    $("#fallModal").classList.remove("hidden");
+  }
   if (ev.type === "cycle_done") {                // 정한 횟수를 마침 → 팝업 (확인을 누를 때까지)
     $("#doneMsg").textContent = ev.message;
     $("#doneModal").classList.remove("hidden");
@@ -302,6 +310,11 @@ function render() {
   $("#thrNow").innerHTML = `<b>${sf.profile === "figure" ? "피규어 시연" : "실제 사람"}</b> 적용 중 — 감속 ${sf.thresholds.slow} m · ` +
     `정지 ${sf.thresholds.stop} m · 재가동 허용 ${sf.thresholds.clear} m`;
   setIfIdle("#guardM", sf.guard_person_m);
+  if (S.fall) {
+    $("#fallNow").textContent = `지금 확신도 ${Math.round(S.fall.conf * 100)}% 이상 · ${S.fall.sec}초`;
+    if (!$("#fallSec").dataset.touched) setIfIdle("#fallSec", S.fall.sec);
+    if (!$("#fallConf").dataset.touched) setIfIdle("#fallConf", Math.round(S.fall.conf * 100));
+  }
   if (S.slow_scale != null) {
     const sp = Math.round(S.slow_scale * 100);
     $("#slowNow").textContent = `지금 ${sp}%`;
@@ -318,7 +331,7 @@ function render() {
   kv("#modelKv", { "사용 중": esc(pc.model), "상태": esc(pc.model_status), "엔진 변환": esc(pc.convert || "—"),
     "로봇 오검출 걸러냄": `${pc.robot_rejects ?? 0}건` });
   if (pc.conf !== undefined) setIfIdle("#confPct", Math.round(pc.conf * 100));
-  const rc = S.recording;
+  const rc = S.recording, cv = S.conveyor || {};       // cv: 입출력 탭을 지울 때 함께 빠졌던 정의 (그 뒤로 이 아래가 멈췄다)
   setIfIdle("#recPre", rc.pre_sec); setIfIdle("#recPost", rc.post_sec); setIfIdle("#recConv", rc.conveyor_post_sec); setIfIdle("#convTimeout", cv.timeout);
   kv("#recKv", { "순환 녹화": `조각 ${rc.segments}개 · ${rc.fps} fps`, "프레임 압축": `${rc.enc_ms} ms`, "만드는 중인 클립": `${rc.jobs}개`,
     "저장된 이벤트": `${S.db.events}건 (미확인 ${S.db.unacked}건)`, "저장 공간 한도": `${S.db.budget_gb} GB`,
@@ -567,6 +580,12 @@ on("#btnCycleStart", async () => {
   await saveIfDirty(); await api("/api/cycle/start", { max_cycles: n });
 });
 on("#doneOk", () => $("#doneModal").classList.add("hidden"));
+let fallEventId = null;
+on("#fallOk", () => {
+  $("#fallModal").classList.add("hidden");
+  if (fallEventId != null) api(`/api/events/${fallEventId}/ack`).then(() => loadEvents()).catch(() => {});
+});
+on("#fallVideo", () => { $("#fallModal").classList.add("hidden"); go("videos"); });
 on("#btnCycleOnce", async () => { await saveIfDirty(); await api("/api/cycle/start", { max_cycles: 1 }); });
 on("#btnCycleStop", () => api("/api/cycle/stop"));
 on("#btnSavePose", async () => {
@@ -651,6 +670,12 @@ on("#btnThr", async () => {
   await api("/api/settings/thresholds", { profile: prof, slow: +$("#thrSlow").value, stop: +$("#thrStop").value,
     clear: +$("#thrClear").value, vanish_grace: +$("#vanGrace").value });
   toast(`'${prof === "figure" ? "피규어 시연" : "실제 사람"}' 기준을 저장했고 바로 적용됩니다`, "ok");
+});
+["#fallSec", "#fallConf"].forEach((id) => $(id).addEventListener("input", (e) => { e.target.dataset.touched = "1"; }));
+on("#btnFall", async () => {
+  await api("/api/settings/fall", { sec: +$("#fallSec").value, conf_pct: +$("#fallConf").value });
+  delete $("#fallSec").dataset.touched; delete $("#fallConf").dataset.touched;
+  toast(`낙상 감지: 확신도 ${$("#fallConf").value}% 이상 ${$("#fallSec").value}초 — 바로 적용됩니다`, "ok");
 });
 $("#slowPct").addEventListener("input", (e) => { e.target.dataset.touched = "1"; $("#slowPctTxt").textContent = `${e.target.value}%`; });
 on("#btnSlow", async () => {
