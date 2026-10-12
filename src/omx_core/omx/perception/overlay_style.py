@@ -9,7 +9,8 @@ import cv2
 import numpy as np
 
 ROBOT = (255, 215, 80)        # 하늘색 (BGR)
-TCP = (255, 80, 255)
+TCP = (68, 68, 239)           # 그리퍼 끝 고리: 빨강 (2026-10-12 사용자 2번)
+SKEL = (71, 224, 253)         # 로봇 팔 선: 노랑 (BGR, #fde047)
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 
@@ -52,7 +53,7 @@ def draw_skeleton(img, uv):
     p = np.asarray(uv, float).round().astype(int)
     t = img.copy()
     for a, b in zip(p[1:-1], p[2:]):
-        cv2.line(t, (int(a[0]), int(a[1])), (int(b[0]), int(b[1])), (255, 235, 170), 2, cv2.LINE_AA)
+        cv2.line(t, (int(a[0]), int(a[1])), (int(b[0]), int(b[1])), SKEL, 2, cv2.LINE_AA)
     img = cv2.addWeighted(t, 0.6, img, 0.4, 0)
     e = (int(p[-1][0]), int(p[-1][1]))
     cv2.circle(img, e, 6, TCP, 1, cv2.LINE_AA)

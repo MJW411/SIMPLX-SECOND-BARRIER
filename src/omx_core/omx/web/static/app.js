@@ -168,11 +168,6 @@ function render() {
   // header
   const b = $("#stateBadge");
   b.textContent = STATE_LABEL[sf.state] || sf.state; b.className = "state " + sf.state;
-  $("#minDist").textContent = sf.min_dist === null ? "사람 없음" : `가장 가까운 사람 ${fx(sf.min_dist, 2)} m`;
-  $("#profileTxt").textContent = `${sf.profile === "figure" ? "피규어 기준" : "실제 사람 기준"} · 감속 ${sf.thresholds.slow} m · 정지 ${sf.thresholds.stop} m · ` +
-    (cal.calibrated && cal.valid !== false ? "로봇 팔까지 거리" : cal.calibrated ? "카메라까지 거리 (보정 틀어짐)" : "카메라까지 거리 (보정 전)");
-  $("#reasons").textContent = sf.reasons.length ? "⚠ " + sf.reasons.join(" · ") : "활성 경보 없음";
-  $("#reasons").classList.toggle("alarm", sf.reasons.length > 0);
   renderStrip();
   const un = $("#unacked"); un.textContent = S.db.unacked; un.classList.toggle("hidden", !S.db.unacked);
 
