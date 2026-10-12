@@ -562,3 +562,31 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .rate-table table { font-size: 14.5px; }
   .rate-table th { font-size: 12.5px; }
 }
+
+/* 2026-10-12 사용자: 모니터링 오른쪽(안전·입구 카메라 · 헬멧)과 통계 탭 글씨 크게 — 줄내림 없도록 넓은 화면에서만 */
+@media (min-width: 1101px) {
+  #page-overview .grid-2 > .stack:last-child .card-h h3 { font-size: 17px; }
+  #page-overview .grid-2 > .stack:last-child .card-h .tag { font-size: 13px; }
+  #page-overview .grid-2 > .stack:last-child .kv { font-size: 15.5px; }
+  #page-overview .grid-2 > .stack:last-child .kv dt { font-size: 14.5px; padding: 7px 12px; }
+  #page-overview .grid-2 > .stack:last-child .kv dd { padding: 7px 12px; }
+  #page-overview .grid-2 > .stack:last-child .btn { font-size: 15.5px; }
+  #page-overview .grid-2 > .stack:last-child .btn.big { font-size: 17px; }
+  #page-overview .grid-2 > .stack:last-child .latch { font-size: 15px; }
+
+  #page-stats .stats-head h2 { font-size: 24px; }
+  #page-stats .stats-head .small, #page-stats .card-h .small { font-size: 14px; }
+  #page-stats .seg button { font-size: 15px; }
+  #page-stats .card-h h3 { font-size: 17px; }
+  #page-stats .kpi span { font-size: 13.5px; }
+  #page-stats .kpi b { font-size: 27px; }
+  #page-stats .kpi small { font-size: 14px; }
+  #page-stats .st-kpis .kpi em { font-size: 13.5px; }
+  #page-stats .rate-table table { font-size: 15.5px; }
+  #page-stats .rate-table th { font-size: 13.5px; }
+  #page-stats .rate-table td { padding: 6px 10px; }
+  #page-stats .donut-legend li { font-size: 15px; }
+  #page-stats .viz.chart .tick { font-size: 14px; }
+  #page-stats .viz .dn-cap { font-size: 12px; }
+  #page-stats .hint { font-size: 13.5px; }
+}
