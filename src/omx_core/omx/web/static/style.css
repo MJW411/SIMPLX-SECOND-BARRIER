@@ -88,7 +88,6 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
   background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: 0 1px 3px rgba(16, 24, 40, .05); }
 .sc { padding: 8px 14px 7px; border-right: 1px solid var(--line); min-width: 0; position: relative; }
 /* 상태 줄 9칸 바탕: 연한 노랑~아이보리 (2026-10-12 사용자). 경고(빨강)는 그대로 빨간 바탕 */
-.sc b, .sc small { text-align: center; }   /* 값·설명은 칸 가운데 (2026-10-12 사용자) */
 .status-strip { background: #fff9e3; border-bottom-color: #efe3b8; }
 .sc { background: #fff9e3; border-right-color: #efe3b8; }
 .sc:last-child { border-right: 0; }
