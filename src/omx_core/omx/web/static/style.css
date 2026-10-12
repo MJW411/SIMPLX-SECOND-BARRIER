@@ -42,8 +42,8 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .brand span { display: block; font-size: 13.5px; color: var(--nav-text); letter-spacing: .06em; }
 .brand.big img { width: 56px; height: 56px; } .brand.big b { font-size: 24px; } .login-card .brand { border-bottom-color: var(--line); }
 .sidebar a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 4px; color: var(--nav-text);
-  cursor: pointer; user-select: none; position: relative; font-weight: 600; font-size: 15.5px; padding: 11px 12px; }
-.sidebar a svg { color: #e3f0ff; width: 20px; height: 20px; }
+  cursor: pointer; user-select: none; position: relative; font-weight: 600; font-size: 17.5px; padding: 12px 12px; }
+.sidebar a svg { color: #e3f0ff; width: 23px; height: 23px; }
 .sidebar a:hover { background: var(--nav-2); color: #fff; } .sidebar a:hover svg { color: #c7d2e2; }
 .sidebar a.active { background: rgba(0,40,110,.28); color: #fff; font-weight: 700; } .sidebar a.active svg { color: #fff; }
 .sidebar a.active::before { content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: #ffffff; }
@@ -501,6 +501,22 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   #page-robot .hint { display: none; }
   #page-robot .rw-foot .btn-row .btn { padding-top: 6px; padding-bottom: 6px; }
 }
+/* 티칭: 왼쪽 영상·도구·자세 / 가운데 조그 / 오른쪽 그리퍼. 넓은 화면에서는 한 화면에 꽉 차고 긴 칸은 안에서 스크롤 (2026-10-12 사용자) */
+.tw-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.tw-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 1100px) { .tw-grid { grid-template-columns: 1fr; } }
+@media (min-width: 1101px) and (max-width: 1499px) { .tw-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .tw-grid > .tw-col:last-child { grid-column: 1 / -1; } }
+@media (min-width: 1500px) and (min-height: 640px) {
+  body[data-page="teach"] .app { height: 100vh; min-height: 0; }
+  body[data-page="teach"] .content { display: flex; flex-direction: column; min-height: 0; padding-bottom: 18px; overflow: auto; }
+  body[data-page="teach"] #page-teach { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #page-teach .tw-grid { flex: 1; min-height: 0; align-items: stretch; }
+  #page-teach .tw-col { min-height: 0; }
+  #page-teach .tw-fill { flex: 1 1 0; min-height: 220px; display: flex; flex-direction: column; }
+  #page-teach .tw-col:nth-child(2) > .tw-fill { flex: 1 1 auto; }   /* 조그는 내용만큼, 남으면 도구가 아래에 */
+  #page-teach .tw-scroll { flex: 1 1 0; min-height: 0; overflow: auto; }
+  #page-teach .jj-row button { padding: 9px 4px; }
+}
 /* 통계: 넓은 화면에서는 스크롤 없이 한 화면에 꽉 차게 (위 줄 = 일별 작업량·사고 유형, 아래 줄 = 이벤트 발생률·시간대별) */
 @media (min-width: 1101px) and (min-height: 640px) {
   body[data-page="stats"] .app { height: 100vh; min-height: 0; }
@@ -563,7 +579,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .brand b { font-size: 20px; }
   .brand span { font-size: 14px; }
   .brand.big b { font-size: 26px; }
-  .sidebar a { font-size: 17px; }
+  .sidebar a { font-size: 19px; }
   .count { font-size: 12px; }
   .side-foot { font-size: 13px; }
   .state-cap { font-size: 11.5px; }
