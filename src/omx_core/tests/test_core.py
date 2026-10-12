@@ -195,6 +195,16 @@ try:
 except LimitError:
     check(True, "관절 조그 형식 오류 거부")
 time.sleep(0.4)
+# 저장된 자세 보정 (2026-10-12 실기: 저장된 HOME [.., -1.549, .., .., 5.91] 때문에 화재 홈 복귀가 늘 거부됨)
+fq = ex.fit_q([0.0322, -1.5493, 1.5493, 1.4021, 5.9135, 0.0537])
+check(abs(fq[4] - (5.9135 - 2 * np.pi)) < 1e-9, f"한 바퀴 넘겨 읽힌 손목 5.91 → {fq[4]:.2f} (같은 방향)")
+check(abs(fq[1] - ex.qmin[1]) < 1e-9, f"어깨 -1.549 (한계 {ex.qmin[1]:.2f} 를 조금 넘음) → 한계로 당김")
+try:
+    ex.check_q(fq)
+    check(True, "보정한 HOME 은 검사 통과")
+except LimitError as e:
+    check(False, f"보정한 HOME 은 검사 통과 ({e})")
+check(abs(ex.fit_q([0, -2.0, 0, 0, 0, 0.1])[1] - -2.0) < 1e-9, "진짜로 한계 밖(-2.0)은 그대로 → 거부되게")
 # 그리퍼 힘: % → 전류(mA)
 check(ex.set_gripper_force(50) == C.limits["gripper_current_cap_ma"] // 2 and ex.gripper_force_pct() == 50, "그리퍼 힘 50% = 상한의 절반 전류")
 ex.set_gripper_force(C.limits["gripper_current_ma"] * 100 / C.limits["gripper_current_cap_ma"])
