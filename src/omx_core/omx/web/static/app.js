@@ -73,6 +73,7 @@ function start() {
 
 // ---------------------------------------------------------------- navigation
 function go(p) {
+  if (p === "program") p = "robot";  // 작업 탭은 로봇 탭과 합침 (로봇·작업)
   if (!$("#page-" + p)) p = "overview";
   page = p;
   document.body.dataset.page = p;

@@ -46,9 +46,8 @@
     <div class="brand"><img src="/static/icon.svg" alt=""><div><b>Second Barrier</b><span>Robot_safety</span></div></div>
     <a data-page="overview" class="active"><svg><use href="#i-overview"/></svg><span>모니터링</span></a>
     <a data-page="stats"><svg><use href="#i-stats"/></svg><span>통계</span></a>
-    <a data-page="robot"><svg><use href="#i-robot"/></svg><span>로봇</span></a>
+    <a data-page="robot"><svg><use href="#i-robot"/></svg><span>로봇·작업</span></a>
     <a data-page="teach"><svg><use href="#i-teach"/></svg><span>티칭</span></a>
-    <a data-page="program"><svg><use href="#i-program"/></svg><span>작업</span></a>
     <a data-page="io"><svg><use href="#i-io"/></svg><span>입출력</span></a>
     <a data-page="events"><svg><use href="#i-events"/></svg><span>이벤트</span><em id="unacked" class="count hidden"></em></a>
     <a data-page="videos"><svg><use href="#i-video"/></svg><span>영상</span><em id="vidUnacked" class="count hidden"></em></a>
@@ -102,7 +101,7 @@
       </div>
     </section>
 
-    <!-- ============ Robot ============ -->
+    <!-- ============ Robot · Program (로봇·작업) ============ -->
     <section class="page hidden" id="page-robot">
       <div class="grid-2">
         <div class="stack">
@@ -130,6 +129,63 @@
           <div class="card-h"><h3>관절</h3><span class="muted small">엔코더 실측값 · 위치는 FK로 계산</span></div>
           <div id="jointList" class="joints"></div>
           <div class="tcp" id="tcpBig"></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-h"><h3>프로그램</h3><span class="tag warn hidden" id="seqDirty">저장 안 됨</span></div>
+          <ol id="seqList" class="seq prog"></ol>
+          <div class="inline-form">
+            <select id="stepType">
+              <option value="move">관절 이동 (MoveJ)</option><option value="linear">직선 이동 (MoveL)</option>
+              <option value="home">홈 이동</option>
+              <option value="grip_open">그리퍼 열기</option><option value="grip_close">그리퍼 닫기</option>
+              <option value="grip">그리퍼 (저장 동작·열림 %)</option>
+              <option value="pause">시간 대기</option><option value="wait_sensor2">센서 대기 (D5)</option>
+              <option value="conveyor">컨베이어</option>
+            </select>
+            <button class="btn" id="btnAddStep">+ 추가</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn ghost" data-quick="grip_open">+ 그리퍼 열기</button>
+            <button class="btn ghost" data-quick="grip_close">+ 그리퍼 닫기</button>
+            <button class="btn ghost" data-quick="wait_sensor2">+ 센서 대기 (D5)</button>
+          </div>
+          <p class="hint">새 단계는 선택한 단계 바로 다음에 들어갑니다. 단계를 누르면 오른쪽에서 편집합니다.</p>
+          <div class="btn-row">
+            <button class="btn primary" id="btnSeqSave">저장</button>
+            <button class="btn" id="btnSeqTemplate">픽앤플레이스 템플릿</button>
+            <button class="btn ghost" id="btnSeqClear">비우기</button>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-h"><h3 id="edTitle">단계 편집</h3>
+              <div class="btn-row tight">
+                <button class="btn ghost" id="btnStepUp" title="위로">↑</button>
+                <button class="btn ghost" id="btnStepDown" title="아래로">↓</button>
+                <button class="btn ghost" id="btnStepDup">복제</button>
+                <button class="btn ghost" id="btnStepDel">삭제</button>
+              </div>
+            </div>
+            <div id="stepEditor" class="step-editor"></div>
+            <div class="btn-row">
+              <button class="btn" id="btnStepRun"><svg><use href="#i-play"/></svg>이 단계만 실행</button>
+              <button class="btn" id="btnRunFrom"><svg><use href="#i-play"/></svg>이 단계부터 1회</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>실행</h3><span id="cycleTag" class="tag"></span></div>
+            <label class="field"><span>반복 횟수 (0 = 정지할 때까지)</span><input type="number" id="cycleCount" min="0" max="9999" step="1" value="3"></label>
+            <div class="btn-row">
+              <button class="btn ok big" id="btnCycleStart"><svg><use href="#i-play"/></svg>반복 시작</button>
+              <button class="btn big" id="btnCycleOnce"><svg><use href="#i-play"/></svg>1회 실행</button>
+              <button class="btn big" id="btnCycleStop"><svg><use href="#i-stop"/></svg>정지</button>
+            </div>
+            <label class="switch"><input type="checkbox" id="gripCheck"><span></span>집기 실패 감지</label>
+            <dl class="kv" id="cycleKv"></dl>
+            <p class="hint">실행 버튼은 저장 안 된 변경이 있으면 먼저 저장합니다. 한 번 실행은 몇 분으로 제한됩니다(safety_limits.yaml).</p>
+          </div>
         </div>
       </div>
     </section>
@@ -220,66 +276,6 @@
       </div>
     </section>
 
-    <!-- ============ Program ============ -->
-    <section class="page hidden" id="page-program">
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-h"><h3>프로그램</h3><span class="tag warn hidden" id="seqDirty">저장 안 됨</span></div>
-          <ol id="seqList" class="seq prog"></ol>
-          <div class="inline-form">
-            <select id="stepType">
-              <option value="move">관절 이동 (MoveJ)</option><option value="linear">직선 이동 (MoveL)</option>
-              <option value="home">홈 이동</option>
-              <option value="grip_open">그리퍼 열기</option><option value="grip_close">그리퍼 닫기</option>
-              <option value="grip">그리퍼 (저장 동작·열림 %)</option>
-              <option value="pause">시간 대기</option><option value="wait_sensor2">센서 대기 (D5)</option>
-              <option value="conveyor">컨베이어</option>
-            </select>
-            <button class="btn" id="btnAddStep">+ 추가</button>
-          </div>
-          <div class="btn-row">
-            <button class="btn ghost" data-quick="grip_open">+ 그리퍼 열기</button>
-            <button class="btn ghost" data-quick="grip_close">+ 그리퍼 닫기</button>
-            <button class="btn ghost" data-quick="wait_sensor2">+ 센서 대기 (D5)</button>
-          </div>
-          <p class="hint">새 단계는 선택한 단계 바로 다음에 들어갑니다. 단계를 누르면 오른쪽에서 편집합니다.</p>
-          <div class="btn-row">
-            <button class="btn primary" id="btnSeqSave">저장</button>
-            <button class="btn" id="btnSeqTemplate">픽앤플레이스 템플릿</button>
-            <button class="btn ghost" id="btnSeqClear">비우기</button>
-          </div>
-        </div>
-        <div class="stack">
-          <div class="card">
-            <div class="card-h"><h3 id="edTitle">단계 편집</h3>
-              <div class="btn-row tight">
-                <button class="btn ghost" id="btnStepUp" title="위로">↑</button>
-                <button class="btn ghost" id="btnStepDown" title="아래로">↓</button>
-                <button class="btn ghost" id="btnStepDup">복제</button>
-                <button class="btn ghost" id="btnStepDel">삭제</button>
-              </div>
-            </div>
-            <div id="stepEditor" class="step-editor"></div>
-            <div class="btn-row">
-              <button class="btn" id="btnStepRun"><svg><use href="#i-play"/></svg>이 단계만 실행</button>
-              <button class="btn" id="btnRunFrom"><svg><use href="#i-play"/></svg>이 단계부터 1회</button>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-h"><h3>실행</h3><span id="cycleTag" class="tag"></span></div>
-            <label class="field"><span>반복 횟수 (0 = 정지할 때까지)</span><input type="number" id="cycleCount" min="0" max="9999" step="1" value="3"></label>
-            <div class="btn-row">
-              <button class="btn ok big" id="btnCycleStart"><svg><use href="#i-play"/></svg>반복 시작</button>
-              <button class="btn big" id="btnCycleOnce"><svg><use href="#i-play"/></svg>1회 실행</button>
-              <button class="btn big" id="btnCycleStop"><svg><use href="#i-stop"/></svg>정지</button>
-            </div>
-            <label class="switch"><input type="checkbox" id="gripCheck"><span></span>집기 실패 감지</label>
-            <dl class="kv" id="cycleKv"></dl>
-            <p class="hint">실행 버튼은 저장 안 된 변경이 있으면 먼저 저장합니다. 한 번 실행은 몇 분으로 제한됩니다(safety_limits.yaml).</p>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <!-- ============ I/O ============ -->
     <section class="page hidden" id="page-io">
