@@ -138,9 +138,9 @@ class HelmetGate:
             if not self.wants_open(now):
                 log.info("헬멧 확인 — 출입문 열림")
             self.open_until = now + self.cfg["door"]["close_sec"]
-            self.state = "헬멧 확인 — 문 열림"
+            self.state = "헬멧 착용 확인 - 문 열림"       # 제어판 판정 문구 (2026-10-12 사용자)
         elif missing:
-            self.state = "헬멧 미착용 — 닫힘 유지"
+            self.state = "헬멧 미착용"
         elif ok:
             self.state = f"헬멧 확인 중 ({self._n}/{h['confirm_frames']})"
         elif helmets:
