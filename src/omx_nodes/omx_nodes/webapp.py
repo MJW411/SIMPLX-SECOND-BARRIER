@@ -24,7 +24,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import omx.web as _web
-from omx.events import EVENT_CATS, INCIDENTS, STATS_ONLY, STORED
+from omx.events import EVENT_CATS, EVENT_SHOWN, INCIDENTS, STATS_ONLY, STORED
 from omx.storage import stats as dash_stats
 EXTS = (".pt", ".engine", ".onnx")          # omx.perception.detector 와 같다 (웹 노드가 cv2·numpy 를 불러오지 않게)
 
@@ -608,7 +608,7 @@ def create_app(ctx):
     def events(limit: int = 50, before: int = None, cat: str = None, user=Depends(require_user)):
         if cat and cat not in EVENT_CATS:
             raise HTTPException(400, "분류는 " + ", ".join(EVENT_CATS))
-        types = EVENT_CATS[cat] if cat else sorted(STORED)
+        types = EVENT_CATS[cat] if cat else EVENT_SHOWN       # '전체' = 화면에 보이는 분류만 (작업·운영·설정 제외)
         return {"events": ctx.db.list(min(limit, 500), before, types=types)}
 
     @app.get("/api/events/summary")
@@ -619,7 +619,8 @@ def create_app(ctx):
         allc = ctx.db.type_counts(sorted(STORED))
         return {"days": days, "by_type": {t: v["n"] for t, v in inc.items()},
                 "total": sum(v["n"] for v in inc.values()),
-                "cat_unacked": {c: sum(allc.get(t, {}).get("unacked", 0) for t in ts) for c, ts in EVENT_CATS.items()}}
+                "cat_unacked": {c: sum(allc.get(t, {}).get("unacked", 0) for t in ts) for c, ts in EVENT_CATS.items()},
+                "shown_unacked": sum(allc.get(t, {}).get("unacked", 0) for t in EVENT_SHOWN)}
 
     @app.get("/api/stats")
     def stats(days: int = 7, user=Depends(require_user)):

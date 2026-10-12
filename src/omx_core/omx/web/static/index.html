@@ -76,10 +76,8 @@
             <div class="card-h"><h3>안전</h3><span id="calBadge" class="tag"></span></div>
             <div id="calWarn" class="latch hidden">보정이 없어 <b>카메라까지 거리</b>로 판단하고 있습니다. 로봇 옆의 사람을 제대로 판단하려면 <b>설정 → 보정 → 자동 보정 시작</b>을 하세요.</div>
             <div id="latchBox" class="latch hidden"></div>
-            <div class="btn-row">
+            <div class="btn-row ov-safety-btns">
               <button class="btn ok big" id="btnRestart"><svg><use href="#i-play"/></svg>재가동</button>
-            </div>
-            <div class="btn-row">
               <button class="btn toggle" id="btnMaint">정비 모드</button>
               <button class="btn danger hidden" id="btnFireEnd">화재 상황 종료</button>
             </div>
@@ -197,33 +195,26 @@
 
     <!-- ============ Teach ============ -->
     <section class="page hidden" id="page-teach">
-      <div class="grid-2">
-        <div class="stack">
+      <!-- 티칭: 왼쪽 영상·도구·자세 / 가운데 조그 / 오른쪽 그리퍼. 넓은 화면에서는 한 화면에 꽉 차고 긴 칸은 안에서 스크롤 (2026-10-12) -->
+      <div class="tw-grid">
+        <div class="tw-col">
           <div class="card pad0"><div class="cam-slot" data-cam="teach"></div></div>
-          <div class="card">
-            <div class="card-h"><h3>도구</h3></div>
-            <div class="btn-row">
-              <button class="btn" id="btnAlignDown">Z축 수직 정렬</button>
-              <button class="btn" id="btnAlignHoriz">수평 정렬</button>
-              <button class="btn toggle" id="btnFreedrive">직접 교시 (프리드라이브)</button>
-            </div>
-            <p class="hint">직접 교시를 켜면 팔 관절의 힘이 빠져 손으로 옮길 수 있습니다. 그리퍼는 계속 잡고 있습니다. 켜기 전에 팔을 손으로 받쳐 주세요.</p>
-          </div>
-          <div class="card">
+          <div class="card tw-fill">
             <div class="card-h"><h3>자세</h3><span class="muted small" id="homeTxt"></span></div>
             <div class="inline-form">
               <input id="poseName" placeholder="자세 이름 (예: pick_above)">
               <button class="btn primary" id="btnSavePose">현재 자세 저장</button>
             </div>
             <p class="hint">픽앤플레이스 템플릿에 쓰는 이름: <code>home</code> <code>pick_above</code> <code>pick</code> <code>place_above</code> <code>place</code></p>
-            <div id="poseList" class="list"></div>
+            <div class="tw-scroll"><div id="poseList" class="list"></div></div>
           </div>
         </div>
-        <div class="stack">
-          <div class="card">
+        <div class="tw-col">
+          <div class="card tw-fill">
             <div class="card-h"><h3>조그</h3>
               <div class="seg" id="jogMode"><button data-m="joint" class="active">관절</button><button data-m="cart">좌표</button></div>
               <label class="switch"><input type="checkbox" id="kbJog"><span></span>키보드</label></div>
+            <div class="tw-scroll">
             <div id="jogJoint" class="jj">
               <div class="jj-row" data-j="0"><span class="jn">J1 베이스<small>좌우 회전</small></span><button data-jj="0,-1"><kbd>A</kbd>−</button><div class="jbar"><i></i><b></b></div><button data-jj="0,1"><kbd>Q</kbd>+</button></div>
               <div class="jj-row" data-j="1"><span class="jn">J2 어깨<small>앞뒤로 숙이기</small></span><button data-jj="1,-1"><kbd>S</kbd>−</button><div class="jbar"><i></i><b></b></div><button data-jj="1,1"><kbd>W</kbd>+</button></div>
@@ -242,9 +233,22 @@
             <p class="hint" id="jogHint">누르고 있는 동안만 움직입니다. 막대 = 관절 가동 범위 안의 현재 위치(각도). 키보드: 관절마다 위 키 +, 아래 키 −.</p>
             <div class="tcp" id="tcpTeach"></div>
             <div class="err small" id="jogBlocked"></div>
+            </div>
           </div>
           <div class="card">
+            <div class="card-h"><h3>도구</h3></div>
+            <div class="btn-row">
+              <button class="btn" id="btnAlignDown">Z축 수직 정렬</button>
+              <button class="btn" id="btnAlignHoriz">수평 정렬</button>
+              <button class="btn toggle" id="btnFreedrive">직접 교시 (프리드라이브)</button>
+            </div>
+            <p class="hint">직접 교시를 켜면 팔 관절의 힘이 빠져 손으로 옮길 수 있습니다. 그리퍼는 계속 잡고 있습니다. 켜기 전에 팔을 손으로 받쳐 주세요.</p>
+          </div>
+        </div>
+        <div class="tw-col">
+          <div class="card tw-fill">
             <div class="card-h"><h3>그리퍼</h3><span class="muted small" id="gripNow"></span></div>
+            <div class="tw-scroll">
             <p class="err small hidden" id="gripWarn"></p>
             <h4 class="sub">가동 범위 <span class="muted small" id="gripRangeNow"></span></h4>
             <div class="form-grid">
@@ -276,6 +280,7 @@
             <details class="more" id="gripRef"><summary>기본 힘 (열기·닫기 단계에서 힘을 따로 정하지 않았을 때)</summary>
               <label class="slider">기본 힘 <input type="range" id="gripDefForce" min="5" max="100" step="5"><b id="gripDefForceTxt"></b></label>
             </details>
+            </div>
           </div>
         </div>
       </div>
@@ -318,8 +323,6 @@
         <button data-c="fire">화재<em class="n" id="ec-fire"></em></button>
         <button data-c="robot">로봇<em class="n" id="ec-robot"></em></button>
         <button data-c="conveyor">컨베이어<em class="n" id="ec-conveyor"></em></button>
-        <button data-c="task">작업<em class="n" id="ec-task"></em></button>
-        <button data-c="ops">운영·설정<em class="n" id="ec-ops"></em></button>
       </div>
       <div class="card">
         <div class="card-h">

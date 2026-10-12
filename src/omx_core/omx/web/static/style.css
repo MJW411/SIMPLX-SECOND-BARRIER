@@ -42,8 +42,8 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .brand span { display: block; font-size: 13.5px; color: var(--nav-text); letter-spacing: .06em; }
 .brand.big img { width: 56px; height: 56px; } .brand.big b { font-size: 24px; } .login-card .brand { border-bottom-color: var(--line); }
 .sidebar a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 4px; color: var(--nav-text);
-  cursor: pointer; user-select: none; position: relative; font-weight: 600; font-size: 15.5px; padding: 11px 12px; }
-.sidebar a svg { color: #e3f0ff; width: 20px; height: 20px; }
+  cursor: pointer; user-select: none; position: relative; font-weight: 600; font-size: 17.5px; padding: 12px 12px; }
+.sidebar a svg { color: #e3f0ff; width: 23px; height: 23px; }
 .sidebar a:hover { background: var(--nav-2); color: #fff; } .sidebar a:hover svg { color: #c7d2e2; }
 .sidebar a.active { background: rgba(0,40,110,.28); color: #fff; font-weight: 700; } .sidebar a.active svg { color: #fff; }
 .sidebar a.active::before { content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: #ffffff; }
@@ -87,11 +87,14 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .status-strip { position: relative; z-index: 19; display: grid; grid-template-columns: repeat(9, minmax(0, 1fr));
   background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: 0 1px 3px rgba(16, 24, 40, .05); }
 .sc { padding: 8px 14px 7px; border-right: 1px solid var(--line); min-width: 0; position: relative; }
+/* 상태 줄 9칸 바탕: 연한 노랑~아이보리 (2026-10-12 사용자). 경고(빨강)는 그대로 빨간 바탕 */
+.status-strip { background: #fff9e3; border-bottom-color: #efe3b8; }
+.sc { background: #fff9e3; border-right-color: #efe3b8; }
 .sc:last-child { border-right: 0; }
-.sc-l { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .04em; white-space: nowrap; }
-.sc b { display: block; font-size: 15px; font-weight: 750; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
-.sc small { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.led { width: 8px; height: 8px; border-radius: 50%; background: #b8c0cc; flex: none; }
+.sc-l { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 700; color: var(--muted); letter-spacing: .04em; white-space: nowrap; }
+.sc b { display: block; font-size: 18px; font-weight: 750; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.sc small { display: block; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.led { width: 15px; height: 15px; border-radius: 50%; background: #b8c0cc; flex: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .7), 0 0 4px rgba(0, 0, 0, .15); }   /* 표시등: 크게 (2026-10-12 사용자) */
 .sc.ok .led { background: #22a35a; } .sc.info .led { background: #2f6fe0; } .sc.off .led { background: #b8c0cc; }
 .sc.warn .led { background: #f59e0b; } .sc.warn b { color: var(--warn); }
 .sc.warn::after, .sc.bad::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; }
@@ -196,10 +199,28 @@ input[type=file] { padding: 6px; }
 #page-overview > .grid-2 > .stack:first-child #kpis { flex: 1 1 auto; grid-auto-rows: 1fr; }
 #page-overview #kpis .kpi { display: flex; flex-direction: column; justify-content: center; }
 /* 오른쪽이 짧을 때: 입구 카메라 칸이 늘어나고, 영상은 늘어난 높이를 채운다 (어느 쪽이 짧든 끝선이 맞게) */
-#page-overview > .grid-2 > .stack:last-child > .card:last-child { flex: 1 1 auto; display: flex; flex-direction: column; }
+/* 오른쪽 열 높이 비율: 안전 1 : 입구 카메라·헬멧 1 (2026-10-12 사용자) */
+#page-overview > .grid-2 > .stack:last-child > .card:first-child { flex: 1 1 0; display: flex; flex-direction: column; }
+/* 칸 안 최적화: 안전 칸의 표가 남는 높이를 고르게 채우고, GATE 글자는 칸 폭에 맞춰 크기가 바뀐다 */
+#page-overview #safetyKv { flex: none; font-size: 16.5px; grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr); }   /* 표는 2×2 로 작게, 글자는 조금 크게 */
+#page-overview #safetyKv dt { font-size: 15px; padding: 5px 12px; } #page-overview #safetyKv dd { padding: 5px 12px; }
+#page-overview #distGauge { flex: 1 1 0; min-height: 70px; margin: 8px 0; position: relative; }   /* 그래프가 남는 높이를 차지 (1:1 비율 유지) */
+#page-overview #distGauge svg { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; }
+#page-overview .ov-safety-btns { flex-wrap: nowrap; }
+#page-overview .ov-safety-btns .btn.big { flex: 1 1 auto; }
+#page-overview .ov-safety-btns .btn.toggle, #page-overview .ov-safety-btns .btn.danger { flex: none; align-self: stretch; }
+#page-overview #safetyKv dt, #page-overview #safetyKv dd { display: flex; align-items: center; }
+#page-overview .ov-helmet-side { container-type: inline-size; }
+#page-overview .gate-badge { padding: 8px 6px; }
+#page-overview .gate-badge b { font-size: clamp(16px, 11.5cqi, 30px); }
+#page-overview .gate-badge span { font-size: clamp(11px, 5.2cqi, 14px); }
+#page-overview .ov-helmet-side { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }   /* 판정·검출 표 1 : GATE 1 (2026-10-12 사용자) */
+#page-overview .ov-helmet-side .kv { grid-auto-rows: 1fr; font-size: clamp(13.5px, 6cqi, 16.5px); }
+#page-overview .ov-helmet-side .kv dt, #page-overview .ov-helmet-side .kv dd { padding: 6px 10px; }
+#page-overview > .grid-2 > .stack:last-child > .card:last-child { flex: 1 1 0; display: flex; flex-direction: column; }
 #page-overview > .grid-2 > .stack:last-child > .card:last-child > .ov-helmet { flex: 1 1 auto; }
 #page-overview .ov-helmet-cam { position: relative; height: 100%; }
-#page-overview .ov-helmet-cam::after { content: ""; display: block; padding-top: 75%; }   /* 최소 4:3 높이 */
+#page-overview .ov-helmet-cam { min-height: 120px; }   /* 비율에 맞춰 높이가 정해지고, 영상은 그 칸을 채움(가장자리 잘림) */
 #page-overview .ov-helmet-img { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
 .kpi { padding: 12px 16px; border-right: 1px solid var(--line); }
@@ -487,6 +508,22 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   #page-robot .hint { display: none; }
   #page-robot .rw-foot .btn-row .btn { padding-top: 6px; padding-bottom: 6px; }
 }
+/* 티칭: 왼쪽 영상·도구·자세 / 가운데 조그 / 오른쪽 그리퍼. 넓은 화면에서는 한 화면에 꽉 차고 긴 칸은 안에서 스크롤 (2026-10-12 사용자) */
+.tw-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.tw-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 1100px) { .tw-grid { grid-template-columns: 1fr; } }
+@media (min-width: 1101px) and (max-width: 1499px) { .tw-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .tw-grid > .tw-col:last-child { grid-column: 1 / -1; } }
+@media (min-width: 1500px) and (min-height: 640px) {
+  body[data-page="teach"] .app { height: 100vh; min-height: 0; }
+  body[data-page="teach"] .content { display: flex; flex-direction: column; min-height: 0; padding-bottom: 18px; overflow: auto; }
+  body[data-page="teach"] #page-teach { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #page-teach .tw-grid { flex: 1; min-height: 0; align-items: stretch; }
+  #page-teach .tw-col { min-height: 0; }
+  #page-teach .tw-fill { flex: 1 1 0; min-height: 220px; display: flex; flex-direction: column; }
+  #page-teach .tw-col:nth-child(2) > .tw-fill { flex: 1 1 auto; }   /* 조그는 내용만큼, 남으면 도구가 아래에 */
+  #page-teach .tw-scroll { flex: 1 1 0; min-height: 0; overflow: auto; }
+  #page-teach .jj-row button { padding: 9px 4px; }
+}
 /* 통계: 넓은 화면에서는 스크롤 없이 한 화면에 꽉 차게 (위 줄 = 일별 작업량·사고 유형, 아래 줄 = 이벤트 발생률·시간대별) */
 @media (min-width: 1101px) and (min-height: 640px) {
   body[data-page="stats"] .app { height: 100vh; min-height: 0; }
@@ -549,7 +586,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .brand b { font-size: 20px; }
   .brand span { font-size: 14px; }
   .brand.big b { font-size: 26px; }
-  .sidebar a { font-size: 17px; }
+  .sidebar a { font-size: 19px; }
   .count { font-size: 12px; }
   .side-foot { font-size: 13px; }
   .state-cap { font-size: 11.5px; }
@@ -560,9 +597,9 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .clock span { font-size: 12.5px; }
   .estop { font-size: 15px; }
   .top-restart { font-size: 16.5px; }
-  .sc-l { font-size: 12px; }
-  .sc b { font-size: 16.5px; }
-  .sc small { font-size: 12px; }
+  .sc-l { font-size: 14.5px; }
+  .sc b { font-size: 19.5px; }
+  .sc small { font-size: 13px; }
   .tag { font-size: 12.5px; }
   .hint { font-size: 14px; }
   .btn.big { font-size: 16.5px; }

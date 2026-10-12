@@ -169,7 +169,6 @@ function render() {
   const b = $("#stateBadge");
   b.textContent = STATE_LABEL[sf.state] || sf.state; b.className = "state " + sf.state;
   renderStrip();
-  const un = $("#unacked"); un.textContent = S.db.unacked; un.classList.toggle("hidden", !S.db.unacked);
 
   // overview
   const lb = $("#latchBox");
@@ -586,7 +585,7 @@ on("#doneOk", () => $("#doneModal").classList.add("hidden"));
 let fallEventId = null;
 on("#fallOk", () => {
   $("#fallModal").classList.add("hidden");
-  if (fallEventId != null) api(`/api/events/${fallEventId}/ack`).then(() => loadEvents()).catch(() => {});
+  if (fallEventId != null) api(`/api/events/${fallEventId}/ack`).then(() => { loadEvents(); loadSummary(); }).catch(() => {});
 });
 on("#fallVideo", () => { $("#fallModal").classList.add("hidden"); go("videos"); });
 on("#btnCycleOnce", async () => { await saveIfDirty(); await api("/api/cycle/start", { max_cycles: 1 }); });
@@ -739,7 +738,7 @@ async function loadEvents() {
 }
 $("#eventList").addEventListener("click", async (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.ack) { await api(`/api/events/${b.dataset.ack}/ack`); loadEvents(); }
+  if (b.dataset.ack) { await api(`/api/events/${b.dataset.ack}/ack`); loadEvents(); loadSummary(); }
 });
 on("#playerClose", () => { $("#playerVideo").pause(); $("#player").classList.add("hidden"); });
 $$("#evFilter button").forEach((b) => b.addEventListener("click", () => {
@@ -759,6 +758,9 @@ async function loadSummary() {
     const el = $("#ec-" + c); if (!el) continue;
     el.textContent = n ? ` ${n}` : ""; el.classList.toggle("hot", n > 0);
   }
+  // 메뉴의 이벤트 미확인 수: 이벤트 화면에 보이는 분류만 (작업·운영·설정 제외, 2026-10-12)
+  const un = $("#unacked"), nu = r.shown_unacked ?? 0;
+  un.textContent = nu; un.classList.toggle("hidden", !nu);
 }
 function drawDonutInto(elD, elL, byType, total, period) {
   const items = Object.entries(byType).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
@@ -1050,7 +1052,8 @@ const VC = { stop: "#dc2626", slow: "#f59e0b", hold: "#fcd34d", clear: "#16a34a"
 function drawGauge(el, th, d, zone, preview = false) {
   if (!el || !th) return;
   const bad = !(th.stop < th.slow && th.slow <= th.clear);
-  const max = Math.max(th.clear * 1.6, th.clear + 0.05), W = 400, x0 = 8, x1 = W - 8, X = (m) => x0 + (x1 - x0) * Math.min(1, Math.max(0, m / max));
+  // 모니터링 안전 칸은 좌표 폭을 줄여 막대·글자를 더 크게 그린다 (2026-10-12 사용자: 그래프 크게)
+  const max = Math.max(th.clear * 1.6, th.clear + 0.05), W = el.id === "distGauge" ? 300 : 400, x0 = 8, x1 = W - 8, X = (m) => x0 + (x1 - x0) * Math.min(1, Math.max(0, m / max));
   const seg = (a, b, c, lbl, ink = "#fff") => `<rect x="${X(a)}" y="22" width="${Math.max(0, X(b) - X(a))}" height="14" fill="${c}"/>` +
     (X(b) - X(a) > 34 ? `<text x="${(X(a) + X(b)) / 2}" y="32.5" class="seg" fill="${ink}">${lbl}</text>` : "");
   const cid = `${el.id}Clip`;

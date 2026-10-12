@@ -41,6 +41,9 @@ EVENT_CATS = {
     "task": ["cycle_start", "cycle_stop", "cycle_done", "cycle_pause", "cycle_resume"],
 }
 EVENT_CATS["ops"] = sorted(STORED - {t for v in EVENT_CATS.values() for t in v})
+# 이벤트 화면에 보이는 분류 — 작업·운영·설정 기록은 DB(통계·기록)에는 남기되 이벤트 화면에서는 뺀다 (2026-10-12 사용자)
+EVENT_SHOWN_CATS = ["safety", "fire", "robot", "conveyor"]
+EVENT_SHOWN = sorted({t for c in EVENT_SHOWN_CATS for t in EVENT_CATS[c]})
 
 # 사고로 세는 종류 (대시보드 '사고 현황' 도넛)
 INCIDENTS = ["human_stop", "vanish", "person_fall", "conveyor_jam", "fire", "estop", "fault", "robot_fault", "pick_fail"]
