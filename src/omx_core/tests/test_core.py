@@ -205,6 +205,14 @@ try:
 except LimitError as e:
     check(False, f"보정한 HOME 은 검사 통과 ({e})")
 check(abs(ex.fit_q([0, -2.0, 0, 0, 0, 0.1])[1] - -2.0) < 1e-9, "진짜로 한계 밖(-2.0)은 그대로 → 거부되게")
+# 직선 이동도 같은 보정 (2026-10-12 실기: 손목을 멈춤점까지 꺾어 티칭한 PICK_UP joint4=1.589 → MoveL 이 늘 거부됨)
+qw = np.array([0.804, -0.051, -0.236, 1.589, -0.718, 0.387])
+try:
+    qs = ex.solve(*K.fk(qw), q5=qw[4], grip=qw[5])
+    check(qs[3] <= ex.qmax[3] + 1e-9 and np.linalg.norm(np.array(K.fk(qs)[:3]) - np.array(K.fk(qw)[:3])) < 0.006,
+          f"한계를 살짝 넘게 티칭한 자세로 직선 이동: 손목 {qs[3]:.3f}로 당기고 위치 차이 6 mm 미만")
+except LimitError as e:
+    check(False, f"한계를 살짝 넘게 티칭한 자세로 직선 이동 ({e})")
 # 그리퍼 힘: % → 전류(mA)
 check(ex.set_gripper_force(50) == C.limits["gripper_current_cap_ma"] // 2 and ex.gripper_force_pct() == 50, "그리퍼 힘 50% = 상한의 절반 전류")
 ex.set_gripper_force(C.limits["gripper_current_ma"] * 100 / C.limits["gripper_current_cap_ma"])
