@@ -52,6 +52,7 @@ class RobotNode(OmxNode):
         self.io = IoProxy(self)
         self.safety = SafetyProxy(self)
         self.runner = CycleRunner(ex, self.teach, self.io, self.events, C.limits, self.safety)
+        self.runner.home_after_done = bool(C["robot"].get("home_after_done", True))
         # 원격 동작 핸들용: 명령으로 시작한 동작의 최근 결과
         self.motions = collections.OrderedDict()
         self.mid = itertools.count(1)

@@ -82,6 +82,7 @@ def build(C, sim=False):
     teach = TeachStore(C.path("poses.json"))
     safety.home_q_fn = teach.home_q
     runner = CycleRunner(ex, teach, io, hub, C.limits, safety)
+    runner.home_after_done = bool(C["robot"].get("home_after_done", True))
     safety.on_fire_start.append(lambda: runner.stop("화재"))
     conveyor = ConveyorMonitor(io, hub, C, safety, runner)
     gate = None

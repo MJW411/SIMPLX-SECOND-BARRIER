@@ -271,7 +271,8 @@ ev2 = []
 cr2 = CycleRunner(FakeEx(), teach, None, SimpleNamespace(emit=lambda t, m, **k: ev2.append((t, m))), C.limits)
 cr2.start(max_cycles=2)
 cr2.thread.join(5.0)
-check(cr2.cycles == 2 and cr2.done and ("cycle_done", "작업 완료 — 2회 반복") in ev2, f"2회 마치면 완료 + 이벤트 ({cr2.status}, {ev2})")
+check(cr2.cycles == 2 and cr2.done and any(t == "cycle_done" and m.startswith("작업 완료 — 2회 반복") for t, m in ev2),
+      f"2회 마치면 완료 + 이벤트 ({cr2.status}, {ev2})")
 check(cr2.snapshot()["done"] and cr2.snapshot()["max_cycles"] == 2, "상태에 완료·목표 횟수")
 cr2.teach = SimpleNamespace(snapshot=lambda: {"sequence": [{"type": "pause", "value": 0.5}], "gripper": {}})
 cr2.start(max_cycles=1)

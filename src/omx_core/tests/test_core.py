@@ -306,22 +306,35 @@ feeding.clear(); threading.Thread(target=_feed, daemon=True).start()
 runner.start(max_cycles=2)
 runner.thread.join(30)
 check(done_steps[:2] == [("before", "pause", 0.3), ("before", "grip", "open")]
-      and done_steps[2:] == [("main", "pause", 0.1), ("main", "pause", 0.2)] * 2 and runner.cycles == 2,
+      and done_steps[2:] == [("main", "pause", 0.1), ("main", "pause", 0.2)] * 2 + [("main", "home", None)] and runner.cycles == 2,
       f"시작 전은 한 번, 반복은 2회: {done_steps}")
 done_steps.clear()
 runner.start(max_cycles=1, start_at=1)
 runner.thread.join(20)
-check(done_steps == [("main", "pause", 0.2)], f"반복 단계부터 실행하면 시작 전은 건너뜀: {done_steps}")
+check(done_steps == [("main", "pause", 0.2)] + [("main", "home", None)], f"반복 단계부터 실행하면 시작 전은 건너뜀 (끝나면 홈): {done_steps}")
 done_steps.clear()
 runner.start(max_cycles=1, start_at=1, section="before")
 runner.thread.join(20)
-check(done_steps == [("before", "grip", "open"), ("main", "pause", 0.1), ("main", "pause", 0.2)],
+check(done_steps == [("before", "grip", "open"), ("main", "pause", 0.1), ("main", "pause", 0.2)] + [("main", "home", None)],
       f"시작 전 단계부터 실행: 그 뒤 시작 전 + 반복 1회 {done_steps}")
 done_steps.clear()
 runner.run_one(0, "before")
 runner.thread.join(10)
 check(done_steps == [("before", "pause", 0.3)] and "시작 전 1단계 실행 완료" in runner.status, f"시작 전 한 단계만: {runner.status}")
 check(runner.snapshot()["section"] == "main", "끝나면 구간 표시는 반복으로 돌아감")
+# 작업 완료 → 홈 복귀 (2026-10-12 사용자)
+ts.set_sequence([{"type": "pause", "value": 0.1}], before_start=[])
+done_steps.clear()
+feeding.clear(); threading.Thread(target=_feed, daemon=True).start()
+runner.start(max_cycles=2)
+runner.thread.join(30)
+check(done_steps[-1][1] == "home" and runner.done and "완료" in runner.status, f"정한 횟수를 마치면 홈으로: {done_steps[-3:]}")
+done_steps.clear()
+runner.home_after_done = False
+runner.start(max_cycles=1)
+runner.thread.join(20)
+check(all(t != "home" for _, t, _ in done_steps), "home_after_done=False 면 복귀하지 않음")
+runner.home_after_done = True
 runner._step = _orig_step
 feeding.set()
 
