@@ -73,8 +73,10 @@ function start() {
 
 // ---------------------------------------------------------------- navigation
 function go(p) {
+  if (p === "program") p = "robot";  // 작업 탭은 로봇 탭과 합침 (로봇·작업)
   if (!$("#page-" + p)) p = "overview";
   page = p;
+  document.body.dataset.page = p;
   $$(".sidebar a").forEach((a) => a.classList.toggle("active", a.dataset.page === p));
   $$(".page").forEach((s) => s.classList.toggle("hidden", s.id !== "page-" + p));
   placeCamera();
@@ -132,7 +134,7 @@ function onEvent(ev) {
     if (window.Notification && Notification.permission === "granted") {
       navigator.serviceWorker?.getRegistration().then((reg) => {
         const opt = { body: ev.message, tag: "omx-" + ev.id, icon: "/static/icon-192.png" };
-        reg ? reg.showNotification("OMX 안전 경보", opt) : new Notification("OMX 안전 경보", opt);
+        reg ? reg.showNotification("안전 경보", opt) : new Notification("안전 경보", opt);
       });
     }
   }
@@ -185,6 +187,7 @@ function render() {
   $("#btnRestart").disabled = !sf.stop_latched;
   $("#topRestart").classList.toggle("hidden", !sf.stop_latched || sf.fire);
   $("#btnFireEnd").classList.toggle("hidden", !sf.fire);
+  $("#btnConvClear").disabled = !sf.conveyor_alarm;
   drawGauge($("#distGauge"), sf.thresholds, sf.min_dist, sf.zone);
   if (page === "overview") drawZoneMap($("#zoneMap"), S.map, sf.thresholds);
   kv("#safetyKv", {
@@ -251,35 +254,17 @@ function render() {
   kv("#cycleKv", { "진행 상황": esc(c.status), "완료 횟수": c.max_cycles ? `${c.cycles} / ${c.max_cycles}회` : `${c.cycles}회`,
     "경과 시간": c.running ? `${c.elapsed}초` : "—" });
 
-  // I/O
-  const d = S.devices;
-  tag("#devTag", d.backend === "virtual" ? "가상 장치" : d.backend, d.healthy ? "info" : "bad");
-  const map = { sensor1: d.sensor1, sensor2: d.sensor2, fire: d.fire, door: d.door_open, conveyor: d.conveyor_on };
-  $$(".tile").forEach((el) => {
-    const v = map[el.dataset.dev], k = el.dataset.dev;
-    el.classList.toggle("on", v);
-    el.querySelector("b").textContent = k === "door" ? (v ? "열림" : "닫힘") : k === "conveyor" ? (v ? "가동 중" : "멈춤") : (v ? "감지" : "없음");
-  });
-  const LAMP = { G: "백색 · 대기", B: "백색 · 작업 중", C: "초록 · 작업 완료", O: "주황 · 사람 감속", R: "빨강 · 사람 정지(재가동 전까지)", Y: "노란 물결 · 화재 대피 유도" };
-  const lc = S.site?.led || d.led || "G";
-  $("#lampTile b").innerHTML = `<i class="lamp-dot lamp-${lc}"></i>${LAMP[lc] || lc}`;
-  $("#devHint").textContent = d.backend === "virtual"
-    ? "가상 장치입니다. 누를 때마다 켜짐/꺼짐이 바뀝니다. 작업 중에는 도착 센서가 꺼져 있으면 컨베이어가 돌고, 켜면 멈춥니다. 화재를 켜면 출입문이 열리고 로봇이 홈으로 돌아갑니다."
-    : "아두이노 실제 장치입니다. 센서 값은 실제 센서(투입 D6·도착 D5)를 따릅니다. 작업 중 투입 센서에 물품이 올라오면 컨베이어가 돌고, 도착 센서가 감지하거나 작업이 끝나면 멈춥니다. 출입문을 누르면 닫힘 시간 동안 열립니다.";
-  kv("#devKv", { "통신": esc(d.health), ...(d.flame != null ? { "화염 센서 값": `${d.flame} (300 넘으면 불꽃 — 센서 보류 중이면 감지 꺼짐)` } : {}) });
   const st = S.site || {};
   const h = st.helmet;
   tag("#helmetTag", !h ? "꺼짐" : st.door_wanted ? "문 열림" : "닫힘", !h ? "" : st.door_wanted ? "ok" : "");
+  tag("#ovHelmetTag", !h ? "꺼짐" : st.door_wanted ? "문 열림" : "닫힘", !h ? "" : st.door_wanted ? "ok" : "");
+  kv("#ovHelmetKv", h ? { "판정": esc(h.state), "검출": h.detections.length ? esc(h.detections.map((x) => `${x.name} ${Math.round(x.conf * 100)}%`).join(", ")) : "—" }
+    : { "판정": "헬멧 게이트 꺼짐" });
   kv("#helmetKv", h ? { "판정": esc(h.state), "검출": h.detections.length ? esc(h.detections.map((x) => `${x.name} ${Math.round(x.conf * 100)}%`).join(", ")) : "—",
     "닫힐 때까지": st.door_wanted ? `${fx(Math.max(h.open_left, st.manual_left), 1)}초` : "—",
     "카메라": h.camera_error ? esc(h.camera_error) : `${h.camera_fps} fps · ${esc(h.model)} ${h.infer_ms} ms` }
     : { "판정": "헬멧 게이트가 꺼져 있습니다 (모노 카메라 또는 모델 없음)" });
   setIfIdle("#doorClose", st.close_sec);
-  const cv = S.conveyor;
-  drawConvChart($("#convChart"), cv);
-  tag("#convTag", sf.conveyor_alarm ? "이상" : cv.timing ? "가동 중" : "멈춤", sf.conveyor_alarm ? "bad" : cv.timing ? "info" : "");
-  kv("#convKv", { "제한시간": `${cv.timeout}초`, "측정": cv.timing ? "컨베이어 가동, 도착 센서 기다리는 중…" : "—",
-    "최근 도착까지": cv.last_travel ? `${fx(cv.last_travel, 2)}초` : "—", "이상": esc(sf.conveyor_alarm || "없음"), "주의": esc(cv.warning || "없음") });
   $("#roiInfo").textContent = S.door_roi ? `[${S.door_roi.join(", ")}]` : "지정 안 됨";
 
   // settings
@@ -553,17 +538,12 @@ on("#btnFreedrive", async () => {
   if (want && !confirm("팔 관절의 힘이 빠져 팔이 처질 수 있습니다. 팔을 손으로 받친 뒤 확인을 누르세요.")) return;
   await api("/api/robot/freedrive", { on: want });
 });
-$$(".tile[data-dev]").forEach((el) => el.addEventListener("click", () => {
-  if (el.dataset.dev === "door") return api("/api/devices/door_open").catch(() => {});
-  if (S?.devices?.backend !== "virtual") return toast("실제 장치입니다 — 센서를 직접 가려 시험하세요");
-  api("/api/devices/virtual", { [el.dataset.dev]: !el.classList.contains("on") }).catch(() => {});
-}));
 on("#btnDoorOpen", () => api("/api/devices/door_open").then(() => toast("출입문을 열었습니다", "ok")).catch(() => {}));
 on("#btnDoorClose", async () => { await api("/api/settings/door", { close_sec: +$("#doorClose").value }); toast("저장했습니다", "ok"); });
-// 입구 카메라: 입출력 화면을 보고 있을 때만 0.5초마다 한 장씩 받는다
+// 입구 카메라: 모니터링 화면을 보고 있을 때만 0.5초마다 한 장씩 받는다
 setInterval(() => {
-  if (page !== "io" || document.hidden || !S?.site?.helmet) return;
-  const img = $("#helmetImg");
+  if (page !== "overview" || document.hidden || !S?.site?.helmet) return;
+  const img = $("#ovHelmetImg");
   if (img.dataset.busy) return;
   img.dataset.busy = "1";
   fetch("/api/helmet/frame.jpg", { cache: "no-store" }).then((r) => r.ok ? r.blob() : null).then((b) => {
@@ -894,6 +874,12 @@ $$("#stDays button").forEach((b) => b.addEventListener("click", () => {
 setInterval(() => { if (page === "stats") loadStats(); }, 60000);
 async function loadStats() {
   const r = await api(`/api/stats?days=${stDays}`, undefined, "GET").catch(() => null); if (!r) return;
+  stLast = r; renderStats(r);
+}
+// 통계 화면은 창 크기에 맞춰 꽉 채우므로 크기가 바뀌면 다시 그림
+let stLast = null, stResizeT = 0;
+window.addEventListener("resize", () => { clearTimeout(stResizeT); stResizeT = setTimeout(() => { if (page === "stats" && stLast) renderStats(stLast); }, 150); });
+function renderStats(r) {
   const T = r.totals, s = r.series;
   $("#stRange").textContent = `${s[0].date} ~ ${s[s.length - 1].date} · ${stDays === 1 ? "오늘" : `최근 ${stDays}일`}`;
   const k = (label, val, unit, sub = "") => `<div class="kpi"><span>${label}</span><b>${val}</b><small>${unit}</small>${sub ? `<em>${sub}</em>` : ""}</div>`;
@@ -906,8 +892,8 @@ async function loadStats() {
     k("하루 평균 사고", fx(T.incidents / stDays, 1), "건/일", ""),
   ].join("");
   drawBars($("#stDaily"), s.map((d) => ({ x: d.date.slice(5).replace("-", "/"), v: d.cycles,
-    tip: `${d.date} · ${d.cycles}회${d.avg_cycle_s ? ` · 평균 ${fx(d.avg_cycle_s, 1)}초` : ""}` })), { avg: T.avg_per_day, color: "#1f4f8f", unit: "회" });
-  drawBars($("#stHour"), r.by_hour.map((v, h) => ({ x: h % 3 === 0 ? String(h) : "", v, tip: `${h}시 · ${v}회` })), { color: "#3b82f6", unit: "회", W: 380, H: 220 });
+    tip: `${d.date} · ${d.cycles}회${d.avg_cycle_s ? ` · 평균 ${fx(d.avg_cycle_s, 1)}초` : ""}` })), { avg: T.avg_per_day, color: "#1f4f8f", unit: "회", fit: true });
+  drawBars($("#stHour"), r.by_hour.map((v, h) => ({ x: h % 3 === 0 ? String(h) : "", v, tip: `${h}시 · ${v}회` })), { color: "#3b82f6", unit: "회", W: 380, H: 220, fit: true });
   drawDonutInto($("#stDonut"), $("#stLegend"), r.incidents, T.incidents, stDays === 1 ? "오늘" : `최근 ${stDays}일`);
   const rows = Object.entries(r.rate).slice(0, 12), mx = Math.max(1, ...rows.map(([, v]) => v.n));
   $("#stRate").innerHTML = rows.length ? `<table><thead><tr><th>이벤트</th><th class="bcol"></th><th>건수</th><th>하루 평균</th><th>100회당</th></tr></thead><tbody>` +
@@ -917,15 +903,14 @@ async function loadStats() {
         `<td class="num">${v.n}</td><td class="num">${fx(v.per_day, 1)}</td><td class="num">${v.per_100 == null ? "—" : fx(v.per_100, 1)}</td></tr>`; }).join("") +
     `</tbody></table><p class="hint">색 있는 줄 = 사고 종류, 회색 = 운영 기록(재가동·작업 시작 등).</p>`
     : `<div class="chart-empty">이 기간에 이벤트가 없습니다</div>`;
-  const types = Object.keys(r.incidents).sort((a, b) => r.incidents[b] - r.incidents[a]);
-  drawStacked($("#stInc"), s.map((d) => ({ x: d.date.slice(5).replace("-", "/"), parts: d.incidents, tip: d.date })), types);
-  $("#stIncLegend").innerHTML = types.map((t) => `<span><i class="lg" style="background:${INC_COLOR[t] || "#64748b"}"></i>${esc(EVENT_LABEL[t] || t)}</span>`).join("");
 }
 
 // 막대 차트 (단일 계열): items [{x, v, tip}], opt {avg, color, unit}
 function drawBars(el, items, opt = {}) {
   if (!el) return;
-  const W = opt.W || 600, H = opt.H || 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
+  // fit: 칸 크기를 그대로 좌표로 써서 늘어나거나 글자가 커지지 않게 함
+  const fit = opt.fit && el.clientWidth > 120 && el.clientHeight > 80;
+  const W = fit ? el.clientWidth : opt.W || 600, H = fit ? el.clientHeight : opt.H || 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
   const top = Math.max(1, ...items.map((d) => d.v), opt.avg || 0) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top), bw = (W - L - R) / n;
   const step = niceStep(top);
   let s = "";
@@ -938,28 +923,6 @@ function drawBars(el, items, opt = {}) {
   });
   if (opt.avg) s += `<line x1="${L}" y1="${Y(opt.avg)}" x2="${W - R}" y2="${Y(opt.avg)}" stroke="#16803c" stroke-width="1.5" stroke-dasharray="5 4"/>` +
     `<text x="${L + 6}" y="${Y(opt.avg) - 5}" class="tick start avg" fill="#16803c">평균 ${fx(opt.avg, 1)}${opt.unit || ""}</text>`;
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${s}</svg>`;
-}
-// 누적 막대 (일별 사고 종류)
-function drawStacked(el, items, types) {
-  if (!el) return;
-  const W = 900, H = 200, L = 34, R = 10, T = 14, B = 24, n = items.length;
-  const tot = items.map((d) => Object.values(d.parts).reduce((a, b) => a + b, 0));
-  if (!tot.some((v) => v)) { el.innerHTML = `<div class="chart-empty">이 기간에 사고가 없습니다</div>`; return; }
-  const top = Math.max(1, ...tot) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top), bw = (W - L - R) / n, step = niceStep(top);
-  let s = "";
-  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 5}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
-  items.forEach((d, i) => {
-    const x = L + i * bw + bw * 0.18, w = bw * 0.64;
-    let acc = 0;
-    for (const t of types) {
-      const v = d.parts[t] || 0; if (!v) continue;
-      s += `<rect x="${x}" y="${Y(acc + v)}" width="${w}" height="${Y(acc) - Y(acc + v)}" fill="${INC_COLOR[t] || "#64748b"}"><title>${esc(d.tip)} · ${esc(EVENT_LABEL[t] || t)} ${v}건</title></rect>`;
-      acc += v;
-    }
-    if (acc && n <= 31) s += `<text x="${x + w / 2}" y="${Y(acc) - 3}" class="tick">${acc}</text>`;
-    if (n <= 14 || i % Math.ceil(n / 14) === 0) s += `<text x="${x + w / 2}" y="${H - 8}" class="tick">${d.x}</text>`;
-  });
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${s}</svg>`;
 }
 function niceStep(top) { const raw = top / 4, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p; return Math.max(1, (m > 5 ? 10 : m > 2 ? 5 : m > 1 ? 2 : 1) * p); }
@@ -1029,34 +992,3 @@ function drawZoneMap(el, m, th) {
     <text x="${W - 2}" y="${H - 2}" class="scale">칸 25 cm</text><text x="${bx}" y="${by + 11}" class="scale mid">로봇</text></svg>`;
 }
 
-// 컨베이어 이동 시간 차트: 최근 도착까지 걸린 시간 막대 + 제한시간 선 + 지금 가동 중이면 진행 막대
-function drawConvChart(el, cv) {
-  if (!el) return;
-  const h = cv.history || [], to = cv.timeout || 0, live = cv.timing && cv.running_for != null ? cv.running_for : null;
-  if (!h.length && live === null) {
-    el.innerHTML = `<div class="chart-empty">아직 기록이 없습니다 — 물품이 도착 센서에 닿을 때마다 걸린 시간이 쌓입니다</div>`;
-    return;
-  }
-  const W = 400, H = 150, L = 30, R = 8, T = 10, B = 22;
-  const vals = h.map((r) => r.s).concat(live !== null ? [live] : []);
-  const top = Math.max(to || 0, ...vals, 1) * 1.15, Y = (v) => T + (H - T - B) * (1 - v / top);
-  const n = 20, bw = (W - L - R) / n;
-  let s = "";
-  const step = top > 30 ? 10 : top > 12 ? 5 : top > 6 ? 2 : 1;
-  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" y1="${Y(v)}" x2="${W - R}" y2="${Y(v)}" class="gl"/><text x="${L - 4}" y="${Y(v) + 3.5}" class="tick end">${v}</text>`;
-  const bars = h.slice(-(live !== null ? n - 1 : n));
-  bars.forEach((r, i) => {
-    const x = L + i * bw + bw * 0.18, w = bw * 0.64, y = Y(r.s);
-    const tm = new Date(r.t * 1000).toTimeString().slice(0, 8);
-    s += `<rect x="${x}" y="${y}" width="${w}" height="${H - B - y}" rx="2" fill="${r.jam ? VC.stop : "#3a5bef"}"><title>${tm} · ${r.jam ? "이상 (도착 안 함)" : fx(r.s, 1) + "초"}</title></rect>`;
-  });
-  if (live !== null) {
-    const i = bars.length, x = L + i * bw + bw * 0.18, w = bw * 0.64, y = Y(live);
-    s += `<rect x="${x}" y="${y}" width="${w}" height="${H - B - y}" rx="2" fill="#93c5fd" class="pulse"><title>지금 가동 중 ${fx(live, 1)}초</title></rect>`;
-  }
-  if (to > 0) s += `<line x1="${L}" y1="${Y(to)}" x2="${W - R}" y2="${Y(to)}" stroke="${VC.stop}" stroke-dasharray="5 4" stroke-width="1.5"/><text x="${W - R}" y="${Y(to) - 4}" class="tick end" fill="${VC.stop}">제한 ${to}초</text>`;
-  const ok = h.filter((r) => !r.jam).map((r) => r.s), avg = ok.length ? ok.reduce((a, b) => a + b, 0) / ok.length : null;
-  if (avg !== null) s += `<line x1="${L}" y1="${Y(avg)}" x2="${W - R}" y2="${Y(avg)}" stroke="${VC.clear}" stroke-width="1.2"/><text x="${W - R - 60}" y="${Y(avg) - 4}" class="tick end" fill="${VC.clear}">평균 ${fx(avg, 1)}초</text>`;
-  s += `<text x="${L}" y="${H - 6}" class="tick">오래전</text><text x="${W - R}" y="${H - 6}" class="tick end">최근</text><text x="4" y="${T + 2}" class="tick">초</text>`;
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="컨베이어 도착 시간">${s}</svg>`;
-}

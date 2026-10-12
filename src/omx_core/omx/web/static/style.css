@@ -6,7 +6,7 @@
   --line: #d8dde5; --line-2: #c3cad5;
   --text: #17202e; --muted: #5a6577; --faint: #97a1b1;
   --accent: #1f4f8f; --accent-2: #173f74; --accent-soft: #e7eef8;
-  --nav: #0e1a2b; --nav-2: #172739; --nav-line: #22344b; --nav-text: #a9b6c9;
+  --nav: #0081ff; --nav-2: #006ee0; --nav-line: #2a96ff; --nav-text: #ffffff;
   --ok: #15803d; --ok-bg: #e6f4ea; --warn: #b45309; --warn-bg: #fff4dc; --danger: #c81e1e; --danger-bg: #fdecec;
   --info: #1d4ed8; --info-bg: #e8effc; --orange: #ea580c;
   --radius: 6px; --shadow: 0 1px 2px rgba(16, 24, 40, .06);
@@ -42,11 +42,11 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .brand span { display: block; font-size: 11px; color: var(--nav-text); letter-spacing: .06em; }
 .brand.big img { width: 42px; height: 42px; } .brand.big b { font-size: 18px; } .login-card .brand { border-bottom-color: var(--line); }
 .sidebar a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 4px; color: var(--nav-text);
-  cursor: pointer; user-select: none; position: relative; font-weight: 500; font-size: 13.5px; }
-.sidebar a svg { color: #6f7f97; }
+  cursor: pointer; user-select: none; position: relative; font-weight: 600; font-size: 15.5px; padding: 11px 12px; }
+.sidebar a svg { color: #e3f0ff; width: 20px; height: 20px; }
 .sidebar a:hover { background: var(--nav-2); color: #fff; } .sidebar a:hover svg { color: #c7d2e2; }
-.sidebar a.active { background: #1d3150; color: #fff; font-weight: 650; } .sidebar a.active svg { color: #7fb0ff; }
-.sidebar a.active::before { content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: #4c8dff; }
+.sidebar a.active { background: rgba(0,40,110,.28); color: #fff; font-weight: 700; } .sidebar a.active svg { color: #fff; }
+.sidebar a.active::before { content: ""; position: absolute; left: -10px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: #ffffff; }
 .count { margin-left: auto; font-style: normal; background: var(--danger); color: #fff; border-radius: 3px; font-size: 11px; padding: 1px 6px; font-weight: 700; }
 .side-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; color: var(--nav-text); font-size: 12px; padding: 10px 8px 4px; border-top: 1px solid var(--nav-line); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #56657a; }
@@ -99,6 +99,7 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 
 /* ---------- cards & grid ---------- */
 .grid-2 { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.page > .grid-2 + .grid-2 { margin-top: 16px; }
 .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; box-shadow: var(--shadow); }
 .card.pad0 { padding: 0; overflow: hidden; position: relative; }
@@ -184,7 +185,7 @@ input[type=file] { padding: 6px; }
 .kpi span { display: block; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .kpi b { font: 700 22px/1.3 var(--mono); color: var(--text); } .kpi small { color: var(--muted); margin-left: 4px; }
 .joints { display: flex; flex-direction: column; gap: 10px; }
-.joint { display: grid; grid-template-columns: 70px 72px 1fr 48px; align-items: center; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.joint { display: grid; grid-template-columns: 88px 72px 1fr 48px; align-items: center; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .joint .n { color: var(--muted); } .joint .v { text-align: right; font-family: var(--mono); }
 .bar { height: 8px; background: var(--panel-2); border-radius: 2px; overflow: hidden; border: 1px solid var(--line); }
 .bar i { display: block; height: 100%; background: var(--accent); }
@@ -203,12 +204,12 @@ input[type=file] { padding: 6px; }
 .cam-slot { min-height: 120px; }
 .cam { position: relative; background: #0b0f16; aspect-ratio: 4 / 3; }
 .cam img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.cam::before { content: "CAM 01 · 작업 구역"; position: absolute; left: 10px; top: 8px; z-index: 1; font: 700 11px var(--mono);
+.cam::before, .ov-helmet-cam::before { content: "CAM 01 · 작업 구역"; position: absolute; left: 10px; top: 8px; z-index: 1; font: 700 11px var(--mono);
   color: #e6edf7; background: rgba(0, 0, 0, .55); padding: 2px 7px; border-radius: 3px; letter-spacing: .04em; }
 .cam.clicking { cursor: crosshair; box-shadow: inset 0 0 0 3px #f59e0b; }
 .cam-hint { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); background: #fbbf24; color: #111;
   padding: 5px 12px; border-radius: 4px; font-weight: 700; z-index: 2; font-size: 13px; }
-.helmet-img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0b0f16; border-radius: 4px; margin-bottom: 10px; }
+/* 모니터링 · 안전 카드 안의 입구 카메라 (작게, 판정 옆에) */
 
 /* ---------- jog ---------- */
 .jog { display: flex; flex-direction: column; gap: 8px; }
@@ -336,6 +337,11 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .viz .tick.end { text-anchor: end; }
 .viz .val { font-size: 13px; font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .viz .val.muted { fill: var(--faint); font-weight: 600; }
+.ov-helmet { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.ov-helmet-cam { position: relative; min-width: 0; }
+.ov-helmet-cam::before { content: "CAM 02 · 입구"; }
+.ov-helmet-img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0b0f16; border-radius: 4px; }
+@media (max-width: 520px) { .ov-helmet { grid-template-columns: 1fr; } }
 .viz.map { background: var(--sunk); border: 1px solid var(--line); border-radius: 4px; padding: 8px; }
 .viz.map svg { max-height: 360px; }
 .viz .zone { fill: #fff; stroke: var(--line-2); stroke-width: .6; }
@@ -364,6 +370,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .donut-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .donut-legend li { display: grid; grid-template-columns: 12px 1fr auto 42px; gap: 8px; align-items: center; padding: 6px 10px; font-size: 13px; border-bottom: 1px solid var(--line); }
 .donut-legend li:last-child { border-bottom: 0; }
+.donut-legend li > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .donut-legend li:first-child { background: var(--sunk); font-weight: 700; }
 .donut-legend i { width: 10px; height: 10px; border-radius: 2px; }
 .donut-legend b { font-family: var(--mono); } .donut-legend small { color: var(--muted); text-align: right; font-family: var(--mono); }
@@ -393,6 +400,50 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .rbar { height: 10px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
 .rbar span { display: block; height: 100%; background: #9aa6b8; border-radius: 2px; }
 @media (max-width: 1280px) { .st-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .st-kpis .kpi:nth-child(n+4) { border-top: 1px solid var(--line); } .st-kpis .kpi:nth-child(3) { border-right: 0; } }
+/* 로봇·작업: 왼쪽 로봇 제어·관절 / 가운데 프로그램 / 오른쪽 실행·단계 편집. 넓은 화면에서는 한 화면에 꽉 차고 긴 목록은 칸 안에서 스크롤 */
+.rw-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.rw-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.kv.kv-2 { grid-template-columns: max-content 1fr max-content 1fr; }
+.rw-foot { border-top: 1px solid var(--line); margin-top: 12px; }
+@media (max-width: 1100px) { .rw-grid { grid-template-columns: 1fr; } .kv.kv-2 { grid-template-columns: max-content 1fr; } }
+@media (min-width: 1101px) and (min-height: 640px) {
+  body[data-page="robot"] .app { height: 100vh; min-height: 0; }
+  body[data-page="robot"] .content { display: flex; flex-direction: column; min-height: 0; padding-bottom: 18px; }
+  body[data-page="robot"] #page-robot { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #page-robot .rw-grid { flex: 1; min-height: 0; align-items: stretch; }
+  #page-robot .rw-col { min-height: 0; }
+  #page-robot .rw-fill { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+  #page-robot .rw-scroll { flex: 1 1 0; min-height: 0; overflow: auto; }
+  #page-robot .joints { gap: 8px; }
+  #page-robot .tcp { margin-top: 12px; }
+  body[data-page="robot"] .content { overflow: auto; }   /* 정말 모자랄 때만 스크롤 */
+  #page-robot .rw-col:last-child .rw-fill { min-height: 240px; }
+  #page-robot .rw-col:nth-child(2) .rw-fill { min-height: 360px; }
+  #page-robot .btn-row .btn.big { flex: 1 1 0; padding-left: 8px; padding-right: 8px; white-space: nowrap; }
+}
+@media (min-width: 1101px) and (max-height: 920px) {
+  #page-robot .hint { display: none; }
+  #page-robot .rw-foot .btn-row .btn { padding-top: 6px; padding-bottom: 6px; }
+}
+/* 통계: 넓은 화면에서는 스크롤 없이 한 화면에 꽉 차게 (위 줄 = 일별 작업량·사고 유형, 아래 줄 = 이벤트 발생률·시간대별) */
+@media (min-width: 1101px) and (min-height: 640px) {
+  body[data-page="stats"] .app { height: 100vh; min-height: 0; }
+  body[data-page="stats"] .content { display: flex; flex-direction: column; min-height: 0; padding-bottom: 18px; }
+  body[data-page="stats"] #page-stats { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #page-stats .st-grid { flex: 1; min-height: 0; grid-template-rows: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+  #page-stats .st-grid > .card { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  #page-stats .viz.chart { flex: 1 1 0; min-height: 0; margin: 0; position: relative; }
+  #page-stats .viz.chart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #page-stats .viz.chart .tick { font-size: 12px; }
+  #page-stats .viz.chart .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; }
+  #page-stats #stRate { flex: 1 1 0; min-height: 0; overflow: auto; }
+  #page-stats .rate-table td { padding: 5px 8px; }
+  #page-stats .rate-table th { position: sticky; top: 0; z-index: 1; }
+  #page-stats .donut-col { flex: 1 1 0; min-height: 0; flex-direction: row; align-items: center; gap: 16px; }
+  #page-stats .donut-col .viz.donut { flex: 0 0 auto; width: min(170px, 38%); }
+  #page-stats .donut-col .viz.donut svg { max-width: 100%; }
+  #page-stats .donut-col .donut-legend { flex: 1; width: auto; max-height: 100%; overflow: auto; }
+}
 @media (max-width: 1100px) { .st-grid { grid-template-columns: 1fr; } .st-grid .span2, .st-grid .span3 { grid-column: auto; } .rate-table .bcol { display: none; } }
 
 .viz.chart text { paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; }
@@ -406,7 +457,7 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .sidebar { position: fixed; bottom: 0; top: auto; left: 0; right: 0; height: auto; flex-direction: row; padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
     border-right: 0; border-top: 1px solid var(--nav-line); z-index: 30; gap: 0; justify-content: space-around; }
   .sidebar .brand, .side-foot { display: none; }
-  .sidebar a { flex-direction: column; gap: 3px; padding: 6px 4px; font-size: 10.5px; flex: 1; text-align: center; }
+  .sidebar a { flex-direction: column; gap: 3px; padding: 6px 4px; font-size: 11.5px; flex: 1; text-align: center; }
   .sidebar a.active::before { display: none; }
   .count { position: absolute; top: 0; right: 18%; margin: 0; font-size: 10px; padding: 0 5px; }
   .topbar { padding: 8px 12px; gap: 10px; }
@@ -426,3 +477,79 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .top-restart { padding: 9px 10px; font-size: 13px; }
 }
 .teachmode-card:has(.on) { border-color: #f59e0b; }
+
+/* 넓은 화면(1600px 이상): 글자 약 10% 크게 — 좁은 화면은 줄내림이 생기지 않도록 기본 크기 유지 */
+@media (min-width: 1600px) {
+  html, body { font-size: 15.5px; }
+  .small { font-size: 14px; }
+  h3 { font-size: 15px; }
+  code { font-size: 13px; }
+  .brand b { font-size: 16.5px; }
+  .brand span { font-size: 12px; }
+  .brand.big b { font-size: 20px; }
+  .sidebar a { font-size: 17px; }
+  .count { font-size: 12px; }
+  .side-foot { font-size: 13px; }
+  .state-cap { font-size: 11.5px; }
+  .state { font-size: 20px; }
+  .top-line b { font-size: 17.5px; }
+  .reasons { font-size: 14px; }
+  .clock b { font-size: 22px; }
+  .clock span { font-size: 12.5px; }
+  .estop { font-size: 14.5px; }
+  .top-restart { font-size: 16.5px; }
+  .sc-l { font-size: 12px; }
+  .sc b { font-size: 16.5px; }
+  .sc small { font-size: 12px; }
+  .tag { font-size: 12.5px; }
+  .hint { font-size: 14px; }
+  .btn.big { font-size: 16.5px; }
+  .field { font-size: 13px; }
+  .slider b { font-size: 14.5px; }
+  .switch { font-size: 14.5px; }
+  .seg button { font-size: 14.5px; }
+  .kv { font-size: 14.5px; }
+  .kv dt { font-size: 14px; }
+  .latch { font-size: 14.5px; }
+  .row-item .meta { font-size: 13px; }
+  .row-item .btn { font-size: 14px; }
+  .pill-home { font-size: 12px; }
+  .kpi span { font-size: 12px; }
+  .kpi b { font-size: 24px; }
+  .joint { font-size: 14.5px; }
+  .tcp span { font-size: 11.5px; }
+  .tcp b { font-size: 15px; }
+  .barrow { font-size: 14.5px; }
+  .cam::before, .ov-helmet-cam::before { font-size: 12px; }
+  .cam-hint { font-size: 14.5px; }
+  .jog-group > span { font-size: 14px; }
+  kbd { font-size: 12px; }
+  .jj-row .jn { font-size: 15px; }
+  .jj-row .jn small { font-size: 12.5px; }
+  .jj-row button { font-size: 17.5px; }
+  .jj-row.grip button { font-size: 14.5px; }
+  .jbar b { font-size: 14.5px; }
+  h4.sub { font-size: 14px; }
+  details.more summary { font-size: 14.5px; }
+  .seq li::before { font-size: 12px; }
+  .tile span { font-size: 12.5px; }
+  .tile b { font-size: 17.5px; }
+  .ev .msg { font-size: 14.5px; }
+  .ev .meta { font-size: 12.5px; }
+  .ev .acts .btn { font-size: 14px; }
+  .thr-now { font-size: 15px; }
+  #vidCat .n { font-size: 13px; }
+  .vid-day { font-size: 13px; }
+  .logbox { font-size: 12.5px; }
+  .alarm-banner { font-size: 22px; }
+  .done-msg { font-size: 22px; }
+  .toast { font-size: 15px; }
+  .chart-empty { font-size: 14px; }
+  .legend { font-size: 13px; }
+  .donut-legend li { font-size: 14.5px; }
+  .subnav .n { font-size: 12px; }
+  .stats-head h2 { font-size: 22px; }
+  .st-kpis .kpi em { font-size: 12.5px; }
+  .rate-table table { font-size: 14.5px; }
+  .rate-table th { font-size: 12.5px; }
+}
