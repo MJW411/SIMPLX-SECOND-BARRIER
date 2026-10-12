@@ -87,6 +87,9 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .status-strip { position: relative; z-index: 19; display: grid; grid-template-columns: repeat(9, minmax(0, 1fr));
   background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: 0 1px 3px rgba(16, 24, 40, .05); }
 .sc { padding: 8px 14px 7px; border-right: 1px solid var(--line); min-width: 0; position: relative; }
+/* 상태 줄 9칸 바탕: 연한 노랑~아이보리 (2026-10-12 사용자). 경고(빨강)는 그대로 빨간 바탕 */
+.status-strip { background: #fff9e3; border-bottom-color: #efe3b8; }
+.sc { background: #fff9e3; border-right-color: #efe3b8; }
 .sc:last-child { border-right: 0; }
 .sc-l { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .04em; white-space: nowrap; }
 .sc b { display: block; font-size: 15px; font-weight: 750; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
