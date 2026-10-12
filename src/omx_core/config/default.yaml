@@ -39,6 +39,7 @@ perception:
   # COCO 모델이면 person 이 쓰인다. 이 중 하나도 없는 모델은 '인식 모델 없음'으로 고장 정지.
   person_classes: [human, fall-down, person]
   fallen_classes: [fall-down]   # 넘어진 사람 (낙상 알림·녹화용. 정지 판단에는 쓰지 않음)
+  show_classes: [helmet]        # 작업 구역 영상에 마스크로 함께 표시만 하는 클래스 (안전 판단에는 안 씀, 2026-10-12)
   min_depth_pixels: 30
   depth_range: [0.12, 4.0]
   max_points: 400          # 사람 한 명당 거리 계산에 쓰는 3D 점 수 (다운샘플)

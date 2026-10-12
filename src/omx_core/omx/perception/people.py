@@ -64,6 +64,7 @@ class Percept:
     shape: tuple = (480, 640)
     brightness: float = 255.0    # 영상 평균 밝기 (조도 부족이면 인식을 믿을 수 없다)
     model_ready: bool = True     # 사람을 볼 수 있는 모델이 올라와 있는가 (아니면 안전 관리자가 고장 정지)
+    helmets: list = field(default_factory=list)   # 화면 표시용 헬멧 검출 [(box, conf, poly)] — 안전 판단에는 안 씀
 
 
 def link_distance(P, links):
@@ -138,6 +139,7 @@ class PeoplePerception:
             names = pc.get("person_classes") or ["person"]
             self._cls_ids = self.det.class_ids(names)
             self._fallen_ids = set(self.det.class_ids(pc.get("fallen_classes", ["fall-down"])))
+            self._show_ids = set(self.det.class_ids(pc.get("show_classes", [])))   # 표시만 하는 클래스 (헬멧)
             self._cls_key = key
             if self.det.ready and not self._cls_ids:
                 log.error("사람 클래스(%s)가 없는 모델: %s", names, self.det.names)
@@ -210,7 +212,11 @@ class PeoplePerception:
             self._calib_check_t = now
             self.check_calibration(f)
         ids, ready = self.person_classes()
-        dets = self.det.infer(f.color, classes=ids) if ready else []
+        show = sorted(getattr(self, "_show_ids", set()) - set(ids))
+        dets = self.det.infer(f.color, classes=ids + show) if ready else []
+        # 헬멧 등 표시 전용 클래스는 따로 떼어 둔다 (사람이 아니므로 거리·정지·사라짐 판단에 넣지 않음, 2026-10-12)
+        shown = [d for d in dets if d.cls in show]
+        dets = [d for d in dets if d.cls not in show]
         rmask = self.robot_mask(f.color) if dets else None
         self.robot_rejects = getattr(self, "robot_rejects", 0)
         intr = self.cam.intr
@@ -221,6 +227,7 @@ class PeoplePerception:
         out = Percept(f.t, f.seq, calibrated=T is not None, infer_ms=self.det.infer_ms, shape=f.color.shape[:2],
                       model_ready=ready)
         out.brightness = float(f.color[::8, ::8].mean())
+        out.helmets = [(d.box, d.conf, d.poly) for d in shown]
         zone = self.cfg["safety"]["zone_base"]
         frac_max = pc.get("robot_filter", {}).get("max_frac", 0.25)
         for d in dets:

@@ -154,8 +154,9 @@ class PerceptionNode(OmxNode):
         img = frame.color.copy()
         C = self.cfg
         prof = C["safety"]["profiles"][C["safety"]["profile"]]
-        if pc is not None and pc.persons:
-            layer = img.copy() if any(p.poly is not None for p in pc.persons) else None   # 마스크가 없으면 블렌드 생략
+        helmets = getattr(pc, "helmets", []) if pc is not None else []
+        if pc is not None and (pc.persons or helmets):
+            layer = img.copy() if (any(p.poly is not None for p in pc.persons) or any(h[2] is not None for h in helmets)) else None
             for p in pc.persons:
                 col = (0, 0, 255) if p.dist < prof["stop"] else (0, 170, 255) if p.dist < prof["slow"] else (0, 200, 0)
                 x1, y1, x2, y2 = map(int, p.box)
@@ -170,6 +171,15 @@ class PerceptionNode(OmxNode):
                 txt = f"{p.dist:.2f}m" if np.isfinite(p.dist) else "?"
                 label = "FALLEN" if p.fallen else p.name
                 cv2.putText(img, f"{label} {p.conf:.2f} {txt}", (x1, max(14, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 2)
+            for hb, hc, hp in helmets:      # 헬멧: 노란 마스크 (표시만)
+                hx1, hy1, hx2, hy2 = map(int, hb)
+                if hp is not None:
+                    cv2.fillPoly(layer, [hp], (0, 215, 255))
+                    cv2.polylines(img, [hp], True, (0, 215, 255), 2)
+                    hx1, hy1 = int(np.min(hp[..., 0])), int(np.min(hp[..., 1]))
+                else:
+                    cv2.rectangle(img, (hx1, hy1), (hx2, hy2), (0, 215, 255), 2)
+                cv2.putText(img, f"helmet {hc:.2f}", (hx1, max(14, hy1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 215, 255), 2)
             if layer is not None:
                 img = cv2.addWeighted(layer, 0.35, img, 0.65, 0)
         pts = self.ex.link_points()
