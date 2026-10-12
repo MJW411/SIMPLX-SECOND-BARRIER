@@ -3,7 +3,14 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 let S = null;                 // latest state from the server
 let ws = null, wsDropped = false;
-let seqDraft = null, seqDirty = false, selIdx = -1, edKey = "";
+// 프로그램 편집: seqDraft = [시작 전 단계…, 반복 단계…] 한 줄로 두고 앞의 bsCount 개가 '시작 전'(Before Start)
+let seqDraft = null, seqDirty = false, selIdx = -1, edKey = "", bsCount = 0, addSec = "main";
+function loadDraft() {
+  const b = S?.teach.before_start || [];
+  seqDraft = JSON.parse(JSON.stringify([...b, ...(S?.teach.sequence || [])])); bsCount = b.length;
+}
+// 선택한 단계 → 서버에 보낼 구간·번호
+function selRef(i = selIdx) { return i < bsCount ? { section: "before", index: i } : { section: "main", index: i - bsCount }; }
 let clickMode = null;         // null | "calib" | "roi"
 let roiClicks = [];
 let evFilter = "all", evCat = "", sumTimer = null;
@@ -234,7 +241,7 @@ function render() {
   fd.classList.toggle("on", rb.freedrive);
   fd.textContent = rb.freedrive ? "직접 교시 끝내기 (이 자리에서 고정)" : "직접 교시 (프리드라이브)";
   renderPoses();
-  if (seqDraft === null) { seqDraft = JSON.parse(JSON.stringify(S.teach.sequence)); seqDirty = false; edKey = ""; }
+  if (seqDraft === null) { loadDraft(); seqDirty = false; edKey = ""; }
   const gp = gripPctOf(rb.q[5]);
   const Gs = S.teach.gripper, gBad = Math.abs(Gs.open - Gs.close) < 0.15;
   $("#gripNow").textContent = gp == null ? `위치 ${fx(rb.q[5], 2)} rad · 힘 ${rb.grip_force}%` : `지금 ${gp}% 열림 · 힘 ${rb.grip_force}%`;
@@ -350,13 +357,18 @@ function newStep(t) {
     grip: { type: "grip", value: 50 }, grip_open: { type: "grip", value: "open" }, grip_close: { type: "grip", value: "close" }, pause: { type: t, value: 1 }, wait_sensor2: { type: t }, conveyor: { type: t, value: "on" } }[t];
 }
 function renderSeq() {
-  const cur = S?.cycle.running ? S.cycle.step : -1;
-  if (selIdx >= (seqDraft || []).length) selIdx = (seqDraft || []).length - 1;
-  const html = (seqDraft || []).length ? seqDraft.map((s, i) =>
-    `<li data-i="${i}" class="t-${s.type} ${cur === i ? "current" : ""} ${selIdx === i ? "sel" : ""}"><span class="lbl">${stepLabel(s)}</span>` +
-    `<span class="arg">${esc(stepArg(s))}</span></li>`).join("")
-    : '<div class="seq-empty">비어 있습니다. 아래에서 단계를 추가하거나 픽앤플레이스 템플릿을 쓰세요.</div>';
-  if ($("#seqList").dataset.h !== html) { $("#seqList").innerHTML = html; $("#seqList").dataset.h = html; }
+  const cy = S?.cycle, cur = cy?.running && cy.step >= 0 ? (cy.section === "before" ? cy.step : bsCount + cy.step) : -1;
+  const all = seqDraft || [];
+  if (selIdx >= all.length) selIdx = all.length - 1;
+  const li = (s, i) => `<li data-i="${i}" class="t-${s.type} ${cur === i ? "current" : ""} ${selIdx === i ? "sel" : ""}"><span class="lbl">${stepLabel(s)}</span>` +
+    `<span class="arg">${esc(stepArg(s))}</span></li>`;
+  const put = (el, html) => { if (el.dataset.h !== html) { el.innerHTML = html; el.dataset.h = html; } };
+  put($("#seqBefore"), bsCount ? all.slice(0, bsCount).map((s, i) => li(s, i)).join("")
+    : '<div class="seq-empty small">비어 있음 — 이 제목을 누르고 단계를 추가하면 반복 전에 한 번만 실행됩니다 (예: 준비 자세, 그리퍼 열기)</div>');
+  put($("#seqList"), all.length > bsCount ? all.slice(bsCount).map((s, i) => li(s, bsCount + i)).join("")
+    : '<div class="seq-empty">비어 있습니다. 아래에서 단계를 추가하거나 픽앤플레이스 템플릿을 쓰세요.</div>');
+  const tgt = selIdx >= 0 ? selRef().section : addSec;
+  $$("#seqBox .seq-sec").forEach((h) => h.classList.toggle("target", h.dataset.sec === tgt));
   $("#seqDirty").classList.toggle("hidden", !seqDirty);
   renderEditor();
 }
@@ -366,7 +378,7 @@ function renderEditor() {
   ["#btnStepUp", "#btnStepDown", "#btnStepDup", "#btnStepDel", "#btnStepRun", "#btnRunFrom"].forEach((id) => { $(id).disabled = !s; });
   if (key === edKey) return;                   // 입력 중인 칸을 다시 그리지 않는다
   edKey = key;
-  $("#edTitle").textContent = s ? `${selIdx + 1}단계 · ${stepLabel(s)}` : "단계 편집";
+  $("#edTitle").textContent = s ? `${selRef().section === "before" ? "시작 전 " : ""}${selRef().index + 1}단계 · ${stepLabel(s)}` : "단계 편집";
   if (!s) { $("#stepEditor").innerHTML = '<div class="seq-empty">왼쪽에서 단계를 누르세요</div>'; return; }
   const poseOpts = Object.keys(S?.teach.poses || {}).map((n) => `<option ${n === s.pose ? "selected" : ""}>${esc(n)}</option>`).join("");
   const speed = `<label class="slider">속도 <input type="range" data-f="speed" min="5" max="100" step="5" value="${s.speed ?? 100}"><b data-show="speed">${s.speed ?? 100}%</b></label>`;
@@ -418,28 +430,47 @@ $("#stepEditor").addEventListener("click", (e) => {
   }
   if (b.dataset.cv) { s.value = b.dataset.cv; edKey = ""; edited(); }
 });
-$("#seqList").addEventListener("click", (e) => {
+$("#seqBox").addEventListener("click", (e) => {
+  const h = e.target.closest(".seq-sec");
+  if (h) { addSec = h.dataset.sec; selIdx = -1; edKey = ""; renderSeq(); return; }   // 제목: 선택 해제, 새 단계는 이 구간 끝에
   const li = e.target.closest("li"); if (!li) return;
-  selIdx = +li.dataset.i; renderSeq();
+  selIdx = +li.dataset.i; addSec = selRef().section; renderSeq();
 });
 function moveSel(d) {
-  const j = selIdx + d; if (selIdx < 0 || j < 0 || j >= seqDraft.length) return;
+  if (selIdx < 0) return;
+  const inB = selIdx < bsCount;
+  // 구간 경계: 반복 첫 단계 ↑ → 시작 전 마지막으로, 시작 전 마지막 단계 ↓ → 반복 첫 단계로 (자리는 그대로, 경계만 옮김)
+  if (d < 0 && !inB && selIdx === bsCount) { bsCount++; edKey = ""; edited(); return; }
+  if (d > 0 && inB && selIdx === bsCount - 1) { bsCount--; edKey = ""; edited(); return; }
+  const j = selIdx + d; if (j < 0 || j >= seqDraft.length) return;
   [seqDraft[selIdx], seqDraft[j]] = [seqDraft[j], seqDraft[selIdx]]; selIdx = j; edKey = ""; edited();
 }
 on("#btnStepUp", () => moveSel(-1));
 on("#btnStepDown", () => moveSel(1));
-on("#btnStepDup", () => { if (selIdx < 0) return; seqDraft.splice(selIdx + 1, 0, JSON.parse(JSON.stringify(seqDraft[selIdx]))); selIdx++; edKey = ""; edited(); });
-on("#btnStepDel", () => { if (selIdx < 0) return; seqDraft.splice(selIdx, 1); selIdx = Math.min(selIdx, seqDraft.length - 1); edKey = ""; edited(); });
+on("#btnStepDup", () => {
+  if (selIdx < 0) return;
+  if (selIdx < bsCount) bsCount++;
+  seqDraft.splice(selIdx + 1, 0, JSON.parse(JSON.stringify(seqDraft[selIdx]))); selIdx++; edKey = ""; edited();
+});
+on("#btnStepDel", () => {
+  if (selIdx < 0) return;
+  if (selIdx < bsCount) bsCount--;
+  seqDraft.splice(selIdx, 1); selIdx = Math.min(selIdx, seqDraft.length - 1); edKey = ""; edited();
+});
 function addStep(t) {
   const s = newStep(t); if (!s) return;
-  if (!seqDraft) seqDraft = JSON.parse(JSON.stringify(S?.teach.sequence || []));
-  const at = selIdx < 0 ? seqDraft.length : selIdx + 1;
+  if (!seqDraft) loadDraft();
+  let at;
+  if (selIdx >= 0) { at = selIdx + 1; if (selIdx < bsCount) bsCount++; }
+  else if (addSec === "before") { at = bsCount; bsCount++; }
+  else at = seqDraft.length;
   seqDraft.splice(at, 0, s); selIdx = at; edKey = ""; edited();
 }
 on("#btnAddStep", () => addStep($("#stepType").value));
 $$("[data-quick]").forEach((b) => b.addEventListener("click", () => addStep(b.dataset.quick)));
 async function saveSeq(quiet) {
-  await api("/api/sequence", { steps: seqDraft }); seqDirty = false; seqDraft = null; edKey = "";
+  await api("/api/sequence", { steps: seqDraft.slice(bsCount), before_start: seqDraft.slice(0, bsCount) });
+  seqDirty = false; seqDraft = null; edKey = "";
   if (!quiet) toast("프로그램을 저장했습니다", "ok");
 }
 async function saveIfDirty() { if (seqDirty) { await saveSeq(true); toast("변경 내용을 저장하고 실행합니다", "info"); } }
@@ -449,9 +480,10 @@ on("#btnSeqTemplate", async () => {
   if (seqDraft?.length && !confirm("지금 프로그램을 픽앤플레이스 템플릿으로 바꿀까요?")) return;
   await api("/api/sequence/template"); seqDraft = null; selIdx = -1; edKey = ""; toast("픽앤플레이스 프로그램을 만들었습니다", "ok");
 });
-on("#btnSeqClear", () => { if (!confirm("모든 단계를 지울까요? (저장해야 반영됩니다)")) return; seqDraft = []; selIdx = -1; edKey = ""; edited(); });
-on("#btnStepRun", async () => { await saveIfDirty(); await api("/api/cycle/step", { index: selIdx }); });
-on("#btnRunFrom", async () => { await saveIfDirty(); await api("/api/cycle/start", { start_at: selIdx, max_cycles: 1 }); });
+on("#btnSeqClear", () => { if (!confirm("시작 전 단계까지 모든 단계를 지울까요? (저장해야 반영됩니다)")) return; seqDraft = []; bsCount = 0; selIdx = -1; edKey = ""; edited(); });
+on("#btnStepRun", async () => { const r = selRef(); await saveIfDirty(); await api("/api/cycle/step", r); });
+// 이 단계부터 1회: 시작 전 단계를 고르면 거기부터 시작 전을 마치고 반복 1회, 반복 단계를 고르면 시작 전은 건너뜀
+on("#btnRunFrom", async () => { const r = selRef(); await saveIfDirty(); await api("/api/cycle/start", { start_at: r.index, section: r.section, max_cycles: 1 }); });
 $("#gripCheck").addEventListener("change", (e) => api("/api/cycle/grip_check", { on: e.target.checked }).catch(() => {}));
 
 // ---------------------------------------------------------------- actions

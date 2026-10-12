@@ -32,8 +32,9 @@ class TeachStore:
         self.path = Path(path)
         self.lock = threading.Lock()
         # gripper: 열림·닫힘 기준 위치(rad)와 기본 힘(%). grips: 저장한 그리퍼 동작 {이름: {"pos": rad, "force": %}}
-        self.data = {"poses": {}, "home": None, "sequence": [], "gripper": {"open": 0.8, "close": 0.0, "force": 50},
-                     "grips": {}}
+        # before_start: 반복 시작 전에 한 번만 하는 단계 (UR PolyScope 'Before Start', 2026-10-12 사용자)
+        self.data = {"poses": {}, "home": None, "sequence": [], "before_start": [],
+                     "gripper": {"open": 0.8, "close": 0.0, "force": 50}, "grips": {}}
         if self.path.exists():
             try:
                 self.data.update(json.loads(self.path.read_text()))
@@ -41,6 +42,7 @@ class TeachStore:
                 pass
         self.data["gripper"].setdefault("force", 50)
         self.data.setdefault("grips", {})
+        self.data.setdefault("before_start", [])
 
     def _save(self):
         tmp = self.path.with_suffix(".tmp")
@@ -92,9 +94,11 @@ class TeachStore:
 
     def delete_grip(self, name):
         with self.lock:
-            used = [i + 1 for i, s in enumerate(self.data["sequence"]) if s.get("type") == "grip" and s.get("preset") == name]
+            used = [f"{i + 1}단계" for i, s in enumerate(self.data["sequence"]) if s.get("type") == "grip" and s.get("preset") == name]
+            used += [f"시작 전 {i + 1}단계" for i, s in enumerate(self.data["before_start"])
+                     if s.get("type") == "grip" and s.get("preset") == name]
             if used:
-                raise ValueError(f"작업 {', '.join(map(str, used))}단계에서 쓰는 중 — 먼저 단계를 바꾸세요")
+                raise ValueError(f"작업 {', '.join(used)}에서 쓰는 중 — 먼저 단계를 바꾸세요")
             self.data["grips"].pop(name, None)
             self._save()
 
@@ -110,9 +114,20 @@ class TeachStore:
         force = step.get("force", g.get("force", 50))
         return grip_target(g, v), force, {"open": "열기", "close": "닫기"}.get(v, f"{v}%")
 
-    def set_sequence(self, steps):
+    def set_sequence(self, steps, before_start=None):
+        """steps = 반복 프로그램. before_start = 시작 전 한 번만 하는 단계 (None 이면 지금 것 유지)."""
+        clean = self._clean_steps(steps, "")
+        before = None if before_start is None else self._clean_steps(before_start, "시작 전 ")
+        with self.lock:
+            self.data["sequence"] = clean
+            if before is not None:
+                self.data["before_start"] = before
+            self._save()
+
+    def _clean_steps(self, steps, where):
         clean = []
         for i, s in enumerate(steps, 1):
+            i = f"{where}{i}"
             t = s.get("type")
             if t not in STEP_TYPES:
                 raise ValueError(f"{i}단계: 알 수 없는 종류 {t}")
@@ -140,9 +155,7 @@ class TeachStore:
             if t == "pause":
                 c["value"] = round(min(600.0, max(0.1, float(s.get("value", 1.0)))), 1)
             clean.append(c)
-        with self.lock:
-            self.data["sequence"] = clean
-            self._save()
+        return clean
 
     def snapshot(self):
         with self.lock:

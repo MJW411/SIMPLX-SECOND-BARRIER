@@ -33,6 +33,7 @@ class CycleRunner:
         self.grip_check = False          # 집기 실패 판정 (물체가 있을 때 켠다)
         self.t_start = 0.0
         self.max_cycles = 0
+        self.section = "main"            # 지금 실행 중인 구간: before(시작 전 한 번) / main(반복)
         self.done = False                # 정한 횟수를 다 마침 → 벽면 초록·완료 알림 (다음 시작·정지까지)
         # 일시 정지: 작업을 끝내지 않고 하던 단계에서 기다린다. 재개하면 그 단계부터 다시, 반복 횟수도 이어서.
         self.pause_evt = threading.Event()
@@ -48,10 +49,15 @@ class CycleRunner:
     def running(self):
         return self.thread is not None and self.thread.is_alive()
 
-    def _check_start(self):
+    def _check_start(self, section="main"):
         if self.running:
             raise RuntimeError("이미 실행 중")
-        seq = self.teach.snapshot()["sequence"]
+        snap = self.teach.snapshot()
+        seq = snap["sequence"]
+        if section == "before":
+            seq = snap.get("before_start", [])
+            if not seq:
+                raise RuntimeError("시작 전 단계가 비어 있음")
         if not seq:
             raise RuntimeError("작업 순서가 비어 있음 — 자세 저장 후 작업 순서 작성 필요")
         if self.safety is not None and (self.safety.fire or self.safety.maintenance):
@@ -60,39 +66,51 @@ class CycleRunner:
             raise RuntimeError("티칭 모드 중에는 작업을 실행할 수 없음 — 티칭 모드를 끄고 실행")
         return seq
 
-    def start(self, max_cycles=0, start_at=0):
-        """반복 실행. start_at: 첫 회차만 이 단계부터 (선택한 단계부터 실행)."""
+    def start(self, max_cycles=0, start_at=0, section="main"):
+        """반복 실행. 시작 전(before_start) 단계를 먼저 한 번 하고, 반복 프로그램을 돈다.
+        start_at: 선택한 단계부터 실행 — section="main" 이면 반복 프로그램의 그 단계부터(시작 전 단계는 건너뜀),
+        section="before" 면 시작 전 단계의 그 단계부터 한 다음 반복 프로그램을 처음부터."""
         seq = self._check_start()
-        if not 0 <= start_at < len(seq):
-            raise RuntimeError(f"없는 단계 {start_at + 1}")
+        before = self.teach.snapshot().get("before_start", [])
+        if section == "before":
+            if not 0 <= start_at < len(before):
+                raise RuntimeError(f"없는 시작 전 단계 {start_at + 1}")
+            before, start_at = before[start_at:], 0
+        else:
+            if not 0 <= start_at < len(seq):
+                raise RuntimeError(f"없는 단계 {start_at + 1}")
+            if start_at:
+                before = []
         self.stop_evt.clear()
         self.pause_evt.clear()
         self.done = False
         self.max_cycles = int(max_cycles)
-        self.thread = threading.Thread(target=self._run, args=(seq, max_cycles, start_at), daemon=True, name="cycle")
+        self.thread = threading.Thread(target=self._run, args=(seq, max_cycles, start_at, before), daemon=True, name="cycle")
         self.thread.start()
 
-    def run_one(self, index):
+    def run_one(self, index, section="main"):
         """한 단계만 실행 (PolyScope 의 '여기로 이동'처럼 단계 시험용)."""
-        seq = self._check_start()
+        seq = self._check_start(section)
         if not 0 <= index < len(seq):
             raise RuntimeError(f"없는 단계 {index + 1}")
         self.stop_evt.clear()
         self.pause_evt.clear()
         self.done = False
 
+        where = "시작 전 " if section == "before" else ""
+
         def one():
-            self.step_idx = index
-            self.status = f"{index + 1}단계만 실행: {seq[index]['type']}"
+            self.step_idx, self.section = index, section
+            self.status = f"{where}{index + 1}단계만 실행: {seq[index]['type']}"
             try:
                 self._step_retry(seq[index], self.status)
-                self.status = f"{index + 1}단계 실행 완료"
+                self.status = f"{where}{index + 1}단계 실행 완료"
             except InterruptedError:
                 self.status = "정지"
             except Exception as e:
-                self.status = f"{index + 1}단계 실패: {e}"
+                self.status = f"{where}{index + 1}단계 실패: {e}"
             finally:
-                self.step_idx = -1
+                self.step_idx, self.section = -1, "main"
         self.thread = threading.Thread(target=one, daemon=True, name="cycle-step")
         self.thread.start()
 
@@ -222,12 +240,21 @@ class CycleRunner:
             if self.stop_evt.is_set():
                 raise InterruptedError()
 
-    def _run(self, seq, max_cycles, start_at=0):
+    def _run(self, seq, max_cycles, start_at=0, before=()):
         self.t_start = time.monotonic()
         self.cycles = 0
         limit = self.L.get("cycle_max_minutes", 0) * 60       # 0 = 시간 제한 없음
-        log.info("반복 시작 (%d단계)", len(seq))
+        log.info("반복 시작 (시작 전 %d단계, 반복 %d단계)", len(before), len(seq))
         try:
+            # 시작 전 (Before Start): 반복 전에 한 번만. 작업량·사이클 시간 통계에는 넣지 않는다
+            self.section = "before"
+            for i, s in enumerate(before):
+                self.step_idx = i
+                self.status = f"시작 전 {i + 1}/{len(before)}단계: {s['type']} {s.get('pose', s.get('value', ''))}"
+                self._step_retry(s, self.status)
+                if self.stop_evt.is_set():
+                    raise InterruptedError()
+            self.section = "main"
             while not self.stop_evt.is_set():
                 t_cycle = time.monotonic()
                 for i, s in enumerate(seq):
@@ -256,6 +283,7 @@ class CycleRunner:
             self.events.emit("cycle_fail", f"반복 중단: {e}", level="warn")
         finally:
             self.step_idx = -1
+            self.section = "main"
 
     def _step(self, s):
         t = s["type"]
@@ -308,7 +336,7 @@ class CycleRunner:
                 time.sleep(0.05)
 
     def snapshot(self):
-        return {"running": self.running, "status": self.status, "step": self.step_idx, "cycles": self.cycles,
+        return {"running": self.running, "status": self.status, "step": self.step_idx, "section": self.section, "cycles": self.cycles,
                 "max_cycles": self.max_cycles, "done": self.done, "grip_check": self.grip_check,
                 "paused": self.paused, "pause_why": self.pause_why if self.paused else "",
                 "elapsed": round(time.monotonic() - self.t_start) if self.running else 0}
