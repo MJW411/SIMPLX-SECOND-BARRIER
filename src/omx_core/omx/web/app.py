@@ -735,49 +735,44 @@ def create_app(ctx):
 
     # ------------------------------------------------------------ 영상 스트림
     def overlay(frame, pc):
+        """작업 구역 영상 오버레이 — 노드 버전(perception_node.overlay)과 같은 모양 (overlay_style, 시안 B)."""
+        from ..perception import overlay_style as OS
         img = frame.color.copy()
         sm = ctx.safety
-        if pc is not None:
-            layer = img.copy()
-            for p in pc.persons:
-                col = (0, 0, 255) if p.dist < sm.profile()["stop"] else (0, 170, 255) if p.dist < sm.profile()["slow"] else (0, 200, 0)
-                x1, y1, x2, y2 = map(int, p.box)
-                # 사람 표시는 마스크(SEG)만 — 테두리 상자(BBOX)는 마스크가 없을 때만 (2026-10-12 사용자)
-                if p.poly is not None:
-                    cv2.fillPoly(layer, [p.poly], col)
-                    cv2.polylines(img, [p.poly], True, col, 2)
-                    y1 = int(np.min(p.poly[..., 1]))          # 글자는 마스크 맨 위에
-                    x1 = int(np.min(p.poly[..., 0]))
-                else:
-                    cv2.rectangle(img, (x1, y1), (x2, y2), col, 2)
-                txt = f"{p.dist:.2f}m" if np.isfinite(p.dist) else "?"
-                cv2.putText(img, f"person {p.conf:.2f} {txt}", (x1, max(14, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 2)
-            for hb, hc, hp in getattr(pc, "helmets", []) or []:      # 헬멧: 노란 마스크 (표시만)
-                hx1, hy1, hx2, hy2 = map(int, hb)
-                if hp is not None:
-                    cv2.fillPoly(layer, [hp], (0, 215, 255))
-                    cv2.polylines(img, [hp], True, (0, 215, 255), 2)
-                    hx1, hy1 = int(np.min(hp[..., 0])), int(np.min(hp[..., 1]))
-                else:
-                    cv2.rectangle(img, (hx1, hy1), (hx2, hy2), (0, 215, 255), 2)
-                cv2.putText(img, f"helmet {hc:.2f}", (hx1, max(14, hy1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 215, 255), 2)
-            img = cv2.addWeighted(layer, 0.35, img, 0.65, 0)
+        labels = OS.Labels(img)
         pts = ctx.ex.link_points()
         if pts is not None and ctx.calib.T_base_cam is not None and ctx.per.calib_valid and ctx.cam.intr is not None:
-            sil = ctx.per._fk_silhouette(img.shape, ctx.calib.T_base_cam, pts)    # 계산한 로봇 모습 전체 (반투명 하늘색)
-            if sil.any():
-                tint = img.copy()
-                tint[sil] = (255, 230, 0)
-                img = cv2.addWeighted(tint, 0.30, img, 0.70, 0)
-                cs, _ = cv2.findContours(sil.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                cv2.drawContours(img, cs, -1, (255, 230, 0), 2)
-            uv = ctx.calib.project(pts[-1:], ctx.cam.intr)
-            if uv is not None:
-                cv2.circle(img, tuple(uv.astype(int)[-1]), 5, (255, 0, 255), -1)
+            sil = ctx.per._fk_silhouette(img.shape, ctx.calib.T_base_cam, pts)
+            uv = ctx.calib.project(pts, ctx.cam.intr)
+            img = OS.draw_robot(img, sil, None if uv is None else uv[2:-1], None if uv is None else uv[-1])
+        if pc is not None:
+            layer, tags = img.copy(), []
+            for p in pc.persons:
+                col = (0, 0, 255) if p.dist < sm.profile()["stop"] else (0, 170, 255) if p.dist < sm.profile()["slow"] else (0, 200, 0)
+                x1, y1 = int(p.box[0]), int(p.box[1])
+                if p.poly is not None:
+                    cv2.fillPoly(layer, [p.poly], col)
+                    x1, y1 = int(np.min(p.poly[..., 0])), int(np.min(p.poly[..., 1]))
+                txt = f"{p.dist:.2f}m" if np.isfinite(p.dist) else "?"
+                tags.append((p.poly, tuple(map(int, p.box)), col, f"person {p.conf:.2f} {txt}", x1, y1))
+            for hb, hc, hp in getattr(pc, "helmets", []) or []:
+                hx1, hy1 = int(hb[0]), int(hb[1])
+                if hp is not None:
+                    cv2.fillPoly(layer, [hp], (0, 215, 255))
+                    hx1, hy1 = int(np.min(hp[..., 0])), int(np.min(hp[..., 1]))
+                tags.append((hp, tuple(map(int, hb)), (0, 215, 255), f"helmet {hc:.2f}", hx1, hy1))
+            img = cv2.addWeighted(layer, 0.25, img, 0.75, 0)
+            for poly, box, col, _, _, _ in tags:
+                if poly is not None:
+                    OS.mask_outline(img, poly, col)
+                else:
+                    cv2.rectangle(img, box[:2], box[2:], col, 1, cv2.LINE_AA)
+            for _, _, col, text, x, y in tags:
+                labels.put(img, text, x, y, col)
         roi = C["safety"].get("door_roi_px")
         if roi:
-            cv2.rectangle(img, (roi[0], roi[1]), (roi[2], roi[3]), (255, 200, 0), 2)
-            cv2.putText(img, "EXIT", (roi[0] + 4, roi[1] + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 200, 0), 2)
+            cv2.rectangle(img, (roi[0], roi[1]), (roi[2], roi[3]), (255, 200, 0), 1, cv2.LINE_AA)
+            labels.put(img, "EXIT", roi[0], roi[1] + 20, (255, 200, 0))
         return img
 
     # 보는 화면이 여러 개(젯슨 화면 + 휴대폰 등)여도 프레임당 오버레이·JPEG 압축은 한 번만 한다

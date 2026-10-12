@@ -24,6 +24,7 @@ blocking_sync()          # CUDA 를 쓰기 전에: GPU 를 기다리는 동안 C
 import cv2  # noqa: E402
 
 from omx.perception.autocalib import AutoCalibrator  # noqa: E402
+from omx.perception import overlay_style as OS  # noqa: E402
 from omx.perception.calib import Calibration  # noqa: E402
 from omx.perception.camera import UsbCamSource, make_camera  # noqa: E402
 from omx.perception.detector import Detector  # noqa: E402
@@ -154,52 +155,45 @@ class PerceptionNode(OmxNode):
         img = frame.color.copy()
         C = self.cfg
         prof = C["safety"]["profiles"][C["safety"]["profile"]]
+        labels = OS.Labels(img)
+        # 1) 로봇: 계산한 로봇 모습(거리 판단·보정 일치율에 쓰는 모양)을 옅은 하늘색 + 매끈한 테두리 + 관절 점 (시안 B)
+        pts = self.ex.link_points()
+        if pts is not None and self.calib.T_base_cam is not None and self.per.calib_valid and self.cam.intr is not None:
+            sil = self.per._fk_silhouette(img.shape, self.calib.T_base_cam, pts)
+            uv = self.calib.project(pts, self.cam.intr)
+            img = OS.draw_robot(img, sil, None if uv is None else uv[2:-1], None if uv is None else uv[-1])
+        # 2) 사람·헬멧: 마스크(SEG)만 — 상자(BBOX)는 마스크가 없을 때만. 라벨은 마지막에 겹치지 않게
         helmets = getattr(pc, "helmets", []) if pc is not None else []
+        tags = []
         if pc is not None and (pc.persons or helmets):
-            layer = img.copy() if (any(p.poly is not None for p in pc.persons) or any(h[2] is not None for h in helmets)) else None
+            layer = img.copy()
             for p in pc.persons:
                 col = (0, 0, 255) if p.dist < prof["stop"] else (0, 170, 255) if p.dist < prof["slow"] else (0, 200, 0)
                 x1, y1, x2, y2 = map(int, p.box)
-                # 사람 표시는 마스크(SEG)만 — 테두리 상자(BBOX)는 마스크가 없을 때만 (2026-10-12 사용자)
                 if p.poly is not None:
                     cv2.fillPoly(layer, [p.poly], col)
-                    cv2.polylines(img, [p.poly], True, col, 2)
-                    y1 = int(np.min(p.poly[..., 1]))          # 글자는 마스크 맨 위에
-                    x1 = int(np.min(p.poly[..., 0]))
-                else:
-                    cv2.rectangle(img, (x1, y1), (x2, y2), col, 2)
+                    x1, y1 = int(np.min(p.poly[..., 0])), int(np.min(p.poly[..., 1]))
                 txt = f"{p.dist:.2f}m" if np.isfinite(p.dist) else "?"
-                label = "FALLEN" if p.fallen else p.name
-                cv2.putText(img, f"{label} {p.conf:.2f} {txt}", (x1, max(14, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 2)
+                tags.append((p.poly, (int(p.box[0]), int(p.box[1]), int(p.box[2]), int(p.box[3])), col,
+                             f"{'FALLEN' if p.fallen else p.name} {p.conf:.2f} {txt}", x1, y1))
             for hb, hc, hp in helmets:      # 헬멧: 노란 마스크 (표시만)
-                hx1, hy1, hx2, hy2 = map(int, hb)
+                hx1, hy1 = int(hb[0]), int(hb[1])
                 if hp is not None:
                     cv2.fillPoly(layer, [hp], (0, 215, 255))
-                    cv2.polylines(img, [hp], True, (0, 215, 255), 2)
                     hx1, hy1 = int(np.min(hp[..., 0])), int(np.min(hp[..., 1]))
+                tags.append((hp, tuple(map(int, hb)), (0, 215, 255), f"helmet {hc:.2f}", hx1, hy1))
+            img = cv2.addWeighted(layer, 0.25, img, 0.75, 0)
+            for poly, box, col, _, _, _ in tags:
+                if poly is not None:
+                    OS.mask_outline(img, poly, col)
                 else:
-                    cv2.rectangle(img, (hx1, hy1), (hx2, hy2), (0, 215, 255), 2)
-                cv2.putText(img, f"helmet {hc:.2f}", (hx1, max(14, hy1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 215, 255), 2)
-            if layer is not None:
-                img = cv2.addWeighted(layer, 0.35, img, 0.65, 0)
-        pts = self.ex.link_points()
-        if pts is not None and self.calib.T_base_cam is not None and self.per.calib_valid and self.cam.intr is not None:
-            # 계산한 로봇 모습 전체(거리 판단·보정 일치율에 쓰는 모양)를 반투명 하늘색 + 테두리로 (2026-10-12 사용자:
-            # 관절 중심을 이은 가는 선은 ㄱ자 팔에서 몸통을 비껴 지나가 어긋나 보였다)
-            sil = self.per._fk_silhouette(img.shape, self.calib.T_base_cam, pts)
-            if sil.any():
-                tint = img.copy()
-                tint[sil] = (255, 230, 0)
-                img = cv2.addWeighted(tint, 0.30, img, 0.70, 0)
-                cs, _ = cv2.findContours(sil.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                cv2.drawContours(img, cs, -1, (255, 230, 0), 2)
-            uv = self.calib.project(pts[-1:], self.cam.intr)
-            if uv is not None:
-                cv2.circle(img, tuple(uv.astype(int)[-1]), 5, (255, 0, 255), -1)      # 그리퍼 끝 (TCP)
+                    cv2.rectangle(img, box[:2], box[2:], col, 1, cv2.LINE_AA)
+            for _, _, col, text, x, y in tags:
+                labels.put(img, text, x, y, col)
         roi = C["safety"].get("door_roi_px")
         if roi:
-            cv2.rectangle(img, (roi[0], roi[1]), (roi[2], roi[3]), (255, 200, 0), 2)
-            cv2.putText(img, "EXIT", (roi[0] + 4, roi[1] + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 200, 0), 2)
+            cv2.rectangle(img, (roi[0], roi[1]), (roi[2], roi[3]), (255, 200, 0), 1, cv2.LINE_AA)
+            labels.put(img, "EXIT", roi[0], roi[1] + 20, (255, 200, 0))
         return img
 
     def _stream_loop(self):
