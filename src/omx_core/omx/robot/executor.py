@@ -122,11 +122,15 @@ class Executor:
         self._run = True
         self.thread = threading.Thread(target=self._loop, name="executor", daemon=True)
 
+    def _arm_gains(self):
+        """설정의 robot.arm_gains {joint2: {i: 300}, ...} → {관절 인덱스: 이득}."""
+        return {JOINTS.index(j): g for j, g in (self.cfg.get("arm_gains") or {}).items() if j in JOINTS}
+
     # ------------------------------------------------------------------ 공개 API
     def start(self):
         self.bus.configure(self.cfg["profile_time_ms"], self.cfg["profile_acc_ms"],
                            self.L["arm_pwm_ratio"], self.cfg.get("bus_watchdog_ms", 0), self._pwm_per_joint(),
-                           self.cfg.get("gripper_gains"))
+                           self.cfg.get("gripper_gains"), self._arm_gains())
         self.state = self.bus.read_state()
         self.torque_on = all(self.bus.torque_state())
         if self.torque_on:
