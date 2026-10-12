@@ -227,7 +227,7 @@ input[type=file] { padding: 6px; }
 .cam-fit.ok { color: #86efac; border-color: rgba(134, 239, 172, .5); }
 .cam-fit.warn { color: #fcd34d; border-color: rgba(252, 211, 77, .5); }
 .cam-fit.bad { color: #fca5a5; border-color: rgba(252, 165, 165, .6); }
-body[data-page="overview"] .cam-fit { display: none; }   /* 모니터링 화면에서는 보정 일치율을 숨김 (2026-10-12 사용자) — 보정·티칭 화면에서는 보임 */
+body[data-page="overview"] .cam-fit { font-size: 10.5px; padding: 1px 6px; top: 9px; opacity: .85; }   /* 모니터링: 작게 (2026-10-12 사용자) */
 .cam.clicking { cursor: crosshair; box-shadow: inset 0 0 0 3px #f59e0b; }
 .cam-hint { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); background: #fbbf24; color: #111;
   padding: 5px 12px; border-radius: 4px; font-weight: 700; z-index: 2; font-size: 13px; }
