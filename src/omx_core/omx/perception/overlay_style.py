@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 ROBOT = (255, 215, 80)        # 하늘색 (BGR)
-TCP = (22, 115, 249)          # 그리퍼 끝 고리: 주황 (BGR, #f97316) — 2026-10-12 사용자: 흰 선 + 주황 고리
+TCP = (38, 38, 220)           # 그리퍼 끝(TCP) 고리·점: 빨강 (BGR, #dc2626) — 2026-10-12 사용자: 흰 선 + 빨강 TCP
 SKEL = (255, 255, 255)        # 로봇 팔 선: 흰색
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 
