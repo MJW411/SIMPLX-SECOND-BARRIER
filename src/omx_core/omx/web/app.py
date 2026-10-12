@@ -733,10 +733,15 @@ def create_app(ctx):
             layer = img.copy()
             for p in pc.persons:
                 col = (0, 0, 255) if p.dist < sm.profile()["stop"] else (0, 170, 255) if p.dist < sm.profile()["slow"] else (0, 200, 0)
+                x1, y1, x2, y2 = map(int, p.box)
+                # 사람 표시는 마스크(SEG)만 — 테두리 상자(BBOX)는 마스크가 없을 때만 (2026-10-12 사용자)
                 if p.poly is not None:
                     cv2.fillPoly(layer, [p.poly], col)
-                x1, y1, x2, y2 = map(int, p.box)
-                cv2.rectangle(img, (x1, y1), (x2, y2), col, 2)
+                    cv2.polylines(img, [p.poly], True, col, 2)
+                    y1 = int(np.min(p.poly[..., 1]))          # 글자는 마스크 맨 위에
+                    x1 = int(np.min(p.poly[..., 0]))
+                else:
+                    cv2.rectangle(img, (x1, y1), (x2, y2), col, 2)
                 txt = f"{p.dist:.2f}m" if np.isfinite(p.dist) else "?"
                 cv2.putText(img, f"person {p.conf:.2f} {txt}", (x1, max(14, y1 - 5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 2)
             img = cv2.addWeighted(layer, 0.35, img, 0.65, 0)
