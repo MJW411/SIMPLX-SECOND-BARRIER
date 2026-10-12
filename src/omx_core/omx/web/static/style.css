@@ -88,13 +88,14 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
   background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: 0 1px 3px rgba(16, 24, 40, .05); }
 .sc { padding: 8px 14px 7px; border-right: 1px solid var(--line); min-width: 0; position: relative; }
 /* 상태 줄 9칸 바탕: 연한 노랑~아이보리 (2026-10-12 사용자). 경고(빨강)는 그대로 빨간 바탕 */
+.sc b, .sc small { text-align: center; }   /* 값·설명은 칸 가운데 (2026-10-12 사용자) */
 .status-strip { background: #fff9e3; border-bottom-color: #efe3b8; }
 .sc { background: #fff9e3; border-right-color: #efe3b8; }
 .sc:last-child { border-right: 0; }
 .sc-l { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 700; color: var(--muted); letter-spacing: .04em; white-space: nowrap; }
 .sc b { display: block; font-size: 18px; font-weight: 750; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .sc small { display: block; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.led { width: 12px; height: 12px; border-radius: 50%; background: #b8c0cc; flex: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .7), 0 0 4px rgba(0, 0, 0, .15); }   /* 표시등: 크게 (2026-10-12 사용자) */
+.led { width: 15px; height: 15px; border-radius: 50%; background: #b8c0cc; flex: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .7), 0 0 4px rgba(0, 0, 0, .15); }   /* 표시등: 크게 (2026-10-12 사용자) */
 .sc.ok .led { background: #22a35a; } .sc.info .led { background: #2f6fe0; } .sc.off .led { background: #b8c0cc; }
 .sc.warn .led { background: #f59e0b; } .sc.warn b { color: var(--warn); }
 .sc.warn::after, .sc.bad::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; }
