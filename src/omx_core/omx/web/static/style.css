@@ -589,4 +589,24 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   #page-stats .viz.chart .tick { font-size: 14px; }
   #page-stats .viz .dn-cap { font-size: 12px; }
   #page-stats .hint { font-size: 13.5px; }
+
+  /* 2026-10-12 사용자: 같은 영역 글씨 진하게 — 굵기·색을 한 단계씩 올림 */
+  #page-overview .grid-2 > .stack:last-child .kv dt { color: #2f3b4e; font-weight: 700; }
+  #page-overview .grid-2 > .stack:last-child .kv dd { color: #0f172a; font-weight: 600; }
+  #page-overview .grid-2 > .stack:last-child .card-h h3 { font-weight: 800; color: #0f172a; }
+  #page-overview .grid-2 > .stack:last-child .btn { font-weight: 700; }
+  #page-overview .grid-2 > .stack:last-child .hint { color: #3c475a; }
+  #page-stats .stats-head h2, #page-stats .card-h h3 { font-weight: 800; color: #0f172a; }
+  #page-stats .stats-head .small, #page-stats .card-h .small, #page-stats .hint { color: #3c475a; font-weight: 600; }
+  #page-stats .kpi span { color: #2f3b4e; font-weight: 800; }
+  #page-stats .kpi b { color: #0f172a; font-weight: 800; }
+  #page-stats .kpi small, #page-stats .st-kpis .kpi em { color: #3c475a; font-weight: 600; }
+  #page-stats .rate-table th { color: #2f3b4e; font-weight: 800; }
+  #page-stats .rate-table td { color: #0f172a; font-weight: 600; }
+  #page-stats .rate-table tr.inc td:first-child { font-weight: 800; }
+  #page-stats .donut-legend li { color: #0f172a; font-weight: 600; }
+  #page-stats .donut-legend small { color: #3c475a; }
+  #page-stats .seg button { font-weight: 700; color: #2f3b4e; }
+  #page-stats .viz.chart .tick { fill: #3c475a; font-weight: 600; }
+  #page-stats .viz .dn-cap { fill: #3c475a; font-weight: 600; }
 }
