@@ -137,6 +137,7 @@ def create_app(ctx):
             "safety_profiles": C["safety"]["profiles"],
             "vanish_grace": C["safety"]["vanish_grace"],
             "slow_scale": C["safety"]["slow_scale"],
+            "start_speed": C["robot"].get("start_speed_ratio") or C.limits["speed_default_ratio"],
             "fall": {"sec": C["safety"].get("fall_confirm_sec", 3.0), "conf": C["safety"].get("fall_min_conf", 0.6)},
             "map": {**(pc.get("persons") or {}), "zone": C["safety"]["zone_base"]},
             "sys": ctx.sysmon.snapshot(),
@@ -257,6 +258,17 @@ def create_app(ctx):
     @app.post("/api/robot/speed")
     def speed(body: dict = Body(...), user=Depends(require_user)):
         return run("robot", "speed", ratio=float(body["ratio"]))
+
+    @app.post("/api/robot/speed_save")
+    def speed_save(body: dict = Body(...), user=Depends(require_user)):
+        """지금 속도를 시작 속도로 저장 — 다시 켜도 이 속도로 시작 (2026-10-12 사용자)."""
+        r = float(body["ratio"])
+        if not 0.01 <= r <= 1.0:
+            raise HTTPException(400, "범위: 1–100 %")
+        run("robot", "speed", ratio=r)
+        ctx.update_config("robot", {"start_speed_ratio": round(r, 3)})
+        ctx.events.emit("settings", f"{user}: 로봇 시작 속도 {r * 100:.0f}% 로 저장", level="info")
+        return {"ok": True}
 
     # ------------------------------------------------------------ 티칭
     @app.post("/api/poses/save")
