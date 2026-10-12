@@ -386,14 +386,6 @@
           </div>
           <div class="stack">
           <div class="card">
-            <div class="card-h"><h3>무인 시험 감시</h3></div>
-            <div class="form-grid">
-              <label class="field"><span>카메라에서 이 거리(m) 안에 사람이 보이면 정지 (0 = 끔)</span><input type="number" id="guardM" step="0.1" min="0" max="5"></label>
-            </div>
-            <button class="btn primary" id="btnGuard">저장</button>
-            <p class="hint">무인 시험용 추가 보호입니다. 보정 여부와 관계없이 동작합니다.</p>
-          </div>
-          <div class="card">
             <div class="card-h"><h3>감속 속도</h3><span class="muted small" id="slowNow"></span></div>
             <label class="slider">감속 구간 속도 <input type="range" id="slowPct" min="10" max="80" step="5"><b id="slowPctTxt"></b></label>
             <button class="btn primary" id="btnSlow">저장</button>
@@ -419,7 +411,7 @@
           <div class="card pad0"><div class="cam-slot" data-cam="calib"></div></div>
           <div class="card">
             <div class="card-h"><h3>카메라-로봇 보정</h3><span id="calTag" class="tag"></span></div>
-            <p class="hint">자동 보정: 조명을 켜고 토크 켜기·재가동 후 누르면, 로봇이 8개 자세를 돌며 주황색 몸체를 기구학 모델에 맞춥니다(약 30초). 수동 보정: 서로 다른 자세 4곳 이상에서 그리퍼 끝을 클릭하거나 ArUco 4x4 마커로 점을 추가합니다.</p>
+            <p class="hint">자동 보정: 조명을 켜고 토크 켜기·재가동 후 누르면, 로봇이 최대 14개 자세(작업 자세 방향 포함)를 돌며 주황색 몸체를 기구학 모델에 맞춥니다(약 50초). 수동 보정: 서로 다른 자세 4곳 이상에서 그리퍼 끝을 클릭하거나 ArUco 4x4 마커로 점을 추가합니다.</p>
             <div class="btn-row"><button class="btn ok wide" id="btnCalAuto">자동 보정 시작</button></div>
             <div class="btn-row">
               <button class="btn" id="btnCalClick">클릭으로 점 추가</button>

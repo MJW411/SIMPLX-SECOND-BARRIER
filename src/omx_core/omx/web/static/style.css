@@ -188,6 +188,11 @@ input[type=file] { padding: 6px; }
 /* ---------- KPIs & joints ---------- */
 /* 모니터링: 왼쪽(카메라 + 숫자 칸)과 오른쪽(안전 + 입구 카메라) 열의 끝선을 맞춘다 — 숫자 칸이 남는 높이만큼 늘어남 (2026-10-12 사용자) */
 #page-overview > .grid-2 { align-items: stretch; }
+/* 설정 → 안전: 오른쪽(감속 속도·낙상 감지) 높이를 왼쪽 거리 기준 칸과 맞춘다 (2026-10-12 사용자) */
+#set-safety > .grid-2 { align-items: stretch; }
+#set-safety > .grid-2 > .stack > .card { flex: 1 1 0; display: flex; flex-direction: column; gap: 12px; }
+#set-safety > .grid-2 > .stack > .card > .hint { margin-top: auto; }
+#set-safety > .grid-2 > .stack > .card > .btn { align-self: flex-start; }
 #page-overview > .grid-2 > .stack:first-child #kpis { flex: 1 1 auto; grid-auto-rows: 1fr; }
 #page-overview #kpis .kpi { display: flex; flex-direction: column; justify-content: center; }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }

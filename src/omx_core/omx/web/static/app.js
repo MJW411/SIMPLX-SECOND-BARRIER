@@ -216,7 +216,6 @@ function render() {
     "구역 판정": { CLEAR: "여유", SLOW: "감속 구역", STOP: "정지 구역" }[sf.zone] || sf.zone,
     "사라짐": `미확인 ${sf.vanish_unresolved}건 · 판정 대기 ${sf.vanish_pending}건`,
     "컨베이어": esc(sf.conveyor_alarm || "정상"), "조명 밝기": sf.brightness ?? "—",
-    "무인 시험 감시": sf.guard_person_m ? `${sf.guard_person_m} m` : "꺼짐",
   });
   const mode = rb.freedrive ? "직접 교시 중" : rb.torque ? "토크 켜짐" : "토크 꺼짐";
   const temps = rb.temp.length ? Math.max(...rb.temp) : "—";
@@ -309,7 +308,6 @@ function render() {
   if (thrShown !== sf.profile && S.safety_profiles) { thrShown = sf.profile; fillThr(); }
   $("#thrNow").innerHTML = `<b>${sf.profile === "figure" ? "피규어 시연" : "실제 사람"}</b> 적용 중 — 감속 ${sf.thresholds.slow} m · ` +
     `정지 ${sf.thresholds.stop} m · 재가동 허용 ${sf.thresholds.clear} m`;
-  setIfIdle("#guardM", sf.guard_person_m);
   if (S.fall) {
     $("#fallNow").textContent = `지금 확신도 ${Math.round(S.fall.conf * 100)}% 이상 · ${S.fall.sec}초`;
     if (!$("#fallSec").dataset.touched) setIfIdle("#fallSec", S.fall.sec);
@@ -687,7 +685,6 @@ on("#btnSlow", async () => {
   await api("/api/settings/slow_scale", { pct: +$("#slowPct").value }); delete $("#slowPct").dataset.touched;
   toast(`감속 속도 ${$("#slowPct").value}% — 바로 적용됩니다`, "ok");
 });
-on("#btnGuard", async () => { await api("/api/settings/guard", { meters: +$("#guardM").value }); toast("저장했습니다", "ok"); });
 on("#btnRec", async () => {
   await api("/api/settings/recording", { pre_sec: +$("#recPre").value, post_sec: +$("#recPost").value, conveyor_post_sec: +$("#recConv").value });
   await api("/api/settings/conveyor", { travel_timeout: +$("#convTimeout").value });
