@@ -281,7 +281,7 @@ def create_app(ctx):
 
     @app.post("/api/sequence")
     def sequence(body: dict = Body(...), user=Depends(require_user)):
-        return run("robot", "sequence", steps=body["steps"])
+        return run("robot", "sequence", steps=body["steps"], before_start=body.get("before_start"))
 
     @app.post("/api/sequence/template")
     def seq_template(user=Depends(require_user)):
@@ -291,12 +291,12 @@ def create_app(ctx):
     def cycle_start(body: dict = Body(default={}), user=Depends(require_user)):
         guard_motion()
         return run("robot", "cycle_start", max_cycles=int(body.get("max_cycles", 0)),
-                   start_at=int(body.get("start_at", 0)), user=user)
+                   start_at=int(body.get("start_at", 0)), section=body.get("section", "main"), user=user)
 
     @app.post("/api/cycle/step")
     def cycle_step(body: dict = Body(...), user=Depends(require_user)):
         guard_motion()
-        return run("robot", "cycle_step", index=int(body["index"]))
+        return run("robot", "cycle_step", index=int(body["index"]), section=body.get("section", "main"))
 
     @app.post("/api/cycle/stop")
     def cycle_stop(user=Depends(require_user)):

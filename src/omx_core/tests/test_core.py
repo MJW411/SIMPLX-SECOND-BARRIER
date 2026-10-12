@@ -277,6 +277,41 @@ runner.start(max_cycles=1, start_at=2)
 runner.thread.join(20)
 check(runner.cycles == 1 and "완료" in runner.status, f"선택한 단계부터 1회: {runner.status}")
 feeding.set()
+# 시작 전 (UR PolyScope 'Before Start'): 반복 전에 한 번만
+ts.set_sequence([{"type": "pause", "value": 0.1}], before_start=[{"type": "pause", "value": 0.3}, {"type": "grip", "value": "open"}])
+check(ts.snapshot()["before_start"] == [{"type": "pause", "value": 0.3}, {"type": "grip", "value": "open"}], "시작 전 단계 저장·정리")
+ts.set_sequence([{"type": "pause", "value": 0.1}, {"type": "pause", "value": 0.2}])
+check(len(ts.snapshot()["before_start"]) == 2, "반복 프로그램만 저장하면 시작 전 단계는 그대로")
+try:
+    ts.set_sequence([{"type": "pause"}], before_start=[{"type": "move", "pose": "없음"}])
+    check(False, "시작 전 단계도 검사")
+except ValueError as e_:
+    check("시작 전 1단계" in str(e_), f"시작 전 단계도 검사 ({e_})")
+done_steps = []
+_orig_step = runner._step
+runner._step = lambda st: (done_steps.append((runner.section, st["type"], st.get("value"))), _orig_step(st))[1]
+feeding.clear(); threading.Thread(target=_feed, daemon=True).start()
+runner.start(max_cycles=2)
+runner.thread.join(30)
+check(done_steps[:2] == [("before", "pause", 0.3), ("before", "grip", "open")]
+      and done_steps[2:] == [("main", "pause", 0.1), ("main", "pause", 0.2)] * 2 and runner.cycles == 2,
+      f"시작 전은 한 번, 반복은 2회: {done_steps}")
+done_steps.clear()
+runner.start(max_cycles=1, start_at=1)
+runner.thread.join(20)
+check(done_steps == [("main", "pause", 0.2)], f"반복 단계부터 실행하면 시작 전은 건너뜀: {done_steps}")
+done_steps.clear()
+runner.start(max_cycles=1, start_at=1, section="before")
+runner.thread.join(20)
+check(done_steps == [("before", "grip", "open"), ("main", "pause", 0.1), ("main", "pause", 0.2)],
+      f"시작 전 단계부터 실행: 그 뒤 시작 전 + 반복 1회 {done_steps}")
+done_steps.clear()
+runner.run_one(0, "before")
+runner.thread.join(10)
+check(done_steps == [("before", "pause", 0.3)] and "시작 전 1단계 실행 완료" in runner.status, f"시작 전 한 단계만: {runner.status}")
+check(runner.snapshot()["section"] == "main", "끝나면 구간 표시는 반복으로 돌아감")
+runner._step = _orig_step
+feeding.set()
 
 
 ex.emergency_stop()

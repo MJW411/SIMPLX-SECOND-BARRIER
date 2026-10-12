@@ -344,7 +344,7 @@ def create_app(ctx):
 
     @app.post("/api/sequence")
     def sequence(body: dict = Body(...), user=Depends(require_user)):
-        return run(lambda: ctx.teach.set_sequence(body["steps"]))
+        return run(lambda: ctx.teach.set_sequence(body["steps"], body.get("before_start")))
 
     @app.post("/api/sequence/template")
     def seq_template(user=Depends(require_user)):
@@ -354,17 +354,18 @@ def create_app(ctx):
     def cycle_start(body: dict = Body(default={}), user=Depends(require_user)):
         guard_motion()
         at = int(body.get("start_at", 0))
-        r = run(lambda: ctx.runner.start(int(body.get("max_cycles", 0)), at))
+        sec = "before" if body.get("section") == "before" else "main"
+        r = run(lambda: ctx.runner.start(int(body.get("max_cycles", 0)), at, sec))
         n = len(ctx.teach.snapshot()["sequence"])
         ctx.hub.emit("cycle_start", f"{user}: 작업 시작 ({n}단계" + (f", {body['max_cycles']}회" if body.get("max_cycles") else "")
-                     + (f", {at + 1}단계부터" if at else "") + ")")
+                     + (f", 시작 전 {at + 1}단계부터" if sec == "before" else f", {at + 1}단계부터" if at else "") + ")")
         return r
 
     @app.post("/api/cycle/step")
     def cycle_step(body: dict = Body(...), user=Depends(require_user)):
         """한 단계만 실행 (단계 시험)."""
         guard_motion()
-        return run(lambda: ctx.runner.run_one(int(body["index"])))
+        return run(lambda: ctx.runner.run_one(int(body["index"]), "before" if body.get("section") == "before" else "main"))
 
     @app.post("/api/cycle/stop")
     def cycle_stop(user=Depends(require_user)):

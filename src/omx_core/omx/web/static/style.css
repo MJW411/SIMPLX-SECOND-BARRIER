@@ -248,6 +248,14 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
 .seq li button { background: var(--panel); border: 1px solid var(--line-2); color: var(--muted); border-radius: 3px; padding: 2px 8px; cursor: pointer; }
 .seq-empty { color: var(--muted); padding: 14px; text-align: center; border: 1px dashed var(--line-2); border-radius: 4px; }
 .seq.prog li { cursor: pointer; }
+/* 프로그램 구간 제목: 시작 전(Before Start) / 반복 프로그램 — 누르면 새 단계가 그 구간 끝에 들어간다 */
+.seq-sec { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 14px 0 6px; padding: 4px 2px 5px;
+  border-bottom: 2px solid var(--line); cursor: pointer; font-weight: 700; font-size: 13px; color: #394559; user-select: none; }
+.seq-sec:first-child { margin-top: 0; }
+.seq-sec em { font-style: normal; font-weight: 600; font-size: 11px; color: var(--muted); margin-left: 4px; letter-spacing: .02em; }
+.seq-sec small { font-weight: 500; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.seq-sec.target { border-bottom-color: var(--accent); color: var(--accent); }
+#seqBefore .seq-empty { padding: 10px; }
 .seq.prog li .lbl { font-weight: 700; min-width: 76px; }
 .seq.prog li.sel { border-color: var(--accent); background: var(--accent-soft); }
 .seq.prog li.current { border-color: var(--ok); box-shadow: inset 3px 0 0 var(--ok); }

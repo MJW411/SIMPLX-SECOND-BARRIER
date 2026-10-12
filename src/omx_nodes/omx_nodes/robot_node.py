@@ -196,11 +196,14 @@ class RobotNode(OmxNode):
 
         def cycle_start(a):
             at = int(a.get("start_at", 0))
-            runner.start(int(a.get("max_cycles", 0)), at)
-            n = len(teach.snapshot()["sequence"])
+            sec = "before" if a.get("section") == "before" else "main"
+            runner.start(int(a.get("max_cycles", 0)), at, sec)
+            snap = teach.snapshot()
+            n, nb = len(snap["sequence"]), len(snap.get("before_start", []))
             self.events.emit("cycle_start", f"{a.get('user', 'admin')}: 작업 시작 ({n}단계"
+                             + (f", 시작 전 {nb}단계" if nb and (sec == "before" or not at) else "")
                              + (f", {a['max_cycles']}회" if a.get("max_cycles") else "")
-                             + (f", {at + 1}단계부터" if at else "") + ")")
+                             + (f", 시작 전 {at + 1}단계부터" if sec == "before" else f", {at + 1}단계부터" if at else "") + ")")
 
         def cycle_stop(a):
             was = runner.running
@@ -249,10 +252,10 @@ class RobotNode(OmxNode):
             "poses_home": lambda a: teach.set_home(a["name"]),
             "pose_gripper": pose_gripper,
             "gripper_range": lambda a: save_grip_range(a.get("open"), a.get("close")),
-            "sequence": lambda a: teach.set_sequence(a["steps"]),
+            "sequence": lambda a: teach.set_sequence(a["steps"], a.get("before_start")),
             "sequence_template": lambda a: teach.set_sequence(pickplace_template(teach.snapshot()["poses"])),
             "cycle_start": cycle_start,
-            "cycle_step": lambda a: runner.run_one(int(a["index"])),
+            "cycle_step": lambda a: runner.run_one(int(a["index"]), "before" if a.get("section") == "before" else "main"),
             "cycle_stop": cycle_stop,
             "runner_stop": lambda a: runner.stop(a.get("why", "정지 명령")),
             "runner_pause": lambda a: runner.pause(a.get("why", "일시 정지"), a.get("pose", "")),
