@@ -169,7 +169,6 @@ function render() {
   const b = $("#stateBadge");
   b.textContent = STATE_LABEL[sf.state] || sf.state; b.className = "state " + sf.state;
   renderStrip();
-  const un = $("#unacked"); un.textContent = S.db.unacked; un.classList.toggle("hidden", !S.db.unacked);
 
   // overview
   const lb = $("#latchBox");
@@ -586,7 +585,7 @@ on("#doneOk", () => $("#doneModal").classList.add("hidden"));
 let fallEventId = null;
 on("#fallOk", () => {
   $("#fallModal").classList.add("hidden");
-  if (fallEventId != null) api(`/api/events/${fallEventId}/ack`).then(() => loadEvents()).catch(() => {});
+  if (fallEventId != null) api(`/api/events/${fallEventId}/ack`).then(() => { loadEvents(); loadSummary(); }).catch(() => {});
 });
 on("#fallVideo", () => { $("#fallModal").classList.add("hidden"); go("videos"); });
 on("#btnCycleOnce", async () => { await saveIfDirty(); await api("/api/cycle/start", { max_cycles: 1 }); });
@@ -739,7 +738,7 @@ async function loadEvents() {
 }
 $("#eventList").addEventListener("click", async (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.ack) { await api(`/api/events/${b.dataset.ack}/ack`); loadEvents(); }
+  if (b.dataset.ack) { await api(`/api/events/${b.dataset.ack}/ack`); loadEvents(); loadSummary(); }
 });
 on("#playerClose", () => { $("#playerVideo").pause(); $("#player").classList.add("hidden"); });
 $$("#evFilter button").forEach((b) => b.addEventListener("click", () => {
@@ -759,6 +758,9 @@ async function loadSummary() {
     const el = $("#ec-" + c); if (!el) continue;
     el.textContent = n ? ` ${n}` : ""; el.classList.toggle("hot", n > 0);
   }
+  // 메뉴의 이벤트 미확인 수: 이벤트 화면에 보이는 분류만 (작업·운영·설정 제외, 2026-10-12)
+  const un = $("#unacked"), nu = r.shown_unacked ?? 0;
+  un.textContent = nu; un.classList.toggle("hidden", !nu);
 }
 function drawDonutInto(elD, elL, byType, total, period) {
   const items = Object.entries(byType).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);

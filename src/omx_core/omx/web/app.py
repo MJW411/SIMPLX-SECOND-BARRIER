@@ -668,8 +668,8 @@ def create_app(ctx):
     # ------------------------------------------------------------ 이벤트·영상
     @app.get("/api/events")
     def events(limit: int = 50, before: int = None, user=Depends(require_user)):
-        from ..events import STORED
-        return {"events": ctx.db.list(min(limit, 500), before, types=sorted(STORED))}
+        from ..events import EVENT_SHOWN
+        return {"events": ctx.db.list(min(limit, 500), before, types=EVENT_SHOWN)}
 
     # 영상 메뉴 분류: 사람 근접 정지 / 물품 미도달(컨베이어) / 화재 / 기타(사라짐·비상정지·고장)
     CLIP_CATS = {"human": ["human_stop"], "conveyor": ["conveyor_jam"], "fire": ["fire"]}
