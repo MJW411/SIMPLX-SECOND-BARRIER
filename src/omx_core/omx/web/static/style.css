@@ -91,10 +91,10 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .status-strip { background: #fff9e3; border-bottom-color: #efe3b8; }
 .sc { background: #fff9e3; border-right-color: #efe3b8; }
 .sc:last-child { border-right: 0; }
-.sc-l { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .04em; white-space: nowrap; }
-.sc b { display: block; font-size: 15px; font-weight: 750; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
-.sc small { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.led { width: 8px; height: 8px; border-radius: 50%; background: #b8c0cc; flex: none; }
+.sc-l { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 700; color: var(--muted); letter-spacing: .04em; white-space: nowrap; }
+.sc b { display: block; font-size: 18px; font-weight: 750; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.sc small { display: block; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.led { width: 12px; height: 12px; border-radius: 50%; background: #b8c0cc; flex: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .7), 0 0 4px rgba(0, 0, 0, .15); }   /* 표시등: 크게 (2026-10-12 사용자) */
 .sc.ok .led { background: #22a35a; } .sc.info .led { background: #2f6fe0; } .sc.off .led { background: #b8c0cc; }
 .sc.warn .led { background: #f59e0b; } .sc.warn b { color: var(--warn); }
 .sc.warn::after, .sc.bad::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; }
@@ -597,9 +597,9 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .clock span { font-size: 12.5px; }
   .estop { font-size: 15px; }
   .top-restart { font-size: 16.5px; }
-  .sc-l { font-size: 12px; }
-  .sc b { font-size: 16.5px; }
-  .sc small { font-size: 12px; }
+  .sc-l { font-size: 14.5px; }
+  .sc b { font-size: 19.5px; }
+  .sc small { font-size: 13px; }
   .tag { font-size: 12.5px; }
   .hint { font-size: 14px; }
   .btn.big { font-size: 16.5px; }
