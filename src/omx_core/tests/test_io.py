@@ -241,6 +241,36 @@ rj.running = True
 cj.step(272.0)
 check(not sj.conveyor_alarm and "새로 시작" in evj.got[-1][1], "작업을 새로 시작하면 자동 해제")
 
+# ---- 시간 자동 해제: 아무 조건이 없어도 auto_clear_sec 뒤 저절로 풀고 재개 (수동 해제 버튼도 그대로)
+check(yaml.safe_load(open(Path(__file__).parent.parent / "config/default.yaml"))["conveyor"]["auto_clear_sec"] == 10.0,
+      "기본 설정: 시간 자동 해제 10초")
+cft = copy.deepcopy(CFG); cft["conveyor"]["auto_clear_sec"] = 10.0
+vt = VirtualIO()
+evt = Events()
+st_ = SimpleNamespace(conveyor_alarm="", fire=False)
+rt = SimpleNamespace(running=True, log=[])
+rt.pause = lambda why, pose="": rt.log.append(("pause", why))
+rt.resume = lambda why: rt.log.append(("resume", why))
+ct = ConveyorMonitor(vt, evt, cft, st_, rt, start=False)
+vt.set_virtual(sensor1=True)
+ct.step(500.0)
+vt.set_virtual(sensor1=False)                       # 물품을 손으로 치움 → 투입·도착 센서 모두 변화 없음
+ct.step(516.0)
+check(st_.conveyor_alarm and rt.log == [("pause", "컨베이어 이상")], "막힘 → 이상·일시 정지")
+ct.step(525.0)
+check(st_.conveyor_alarm, "10초 전에는 유지")
+ct.step(526.0)
+check(not st_.conveyor_alarm and "자동 해제" in evt.got[-1][1] and rt.log[-1][0] == "resume", "10초 지나면 저절로 해제·재개")
+ct.step(527.0)
+check(not st_.conveyor_alarm and rt.log.count(("resume", "컨베이어 이상 해제")) == 1, "한 번만 재개")
+cfo = copy.deepcopy(CFG); cfo["conveyor"]["auto_clear_sec"] = 0
+so = SimpleNamespace(conveyor_alarm="", fire=False)
+vo = VirtualIO()
+co = ConveyorMonitor(vo, Events(), cfo, so, SimpleNamespace(running=True), start=False)
+vo.set_virtual(sensor1=True); co.step(600.0); vo.set_virtual(sensor1=False); co.step(616.0)
+co.step(700.0)
+check(so.conveyor_alarm, "auto_clear_sec: 0 → 시간으로는 안 풀림 (예전처럼)")
+
 # ---- 도착 센서 고장 시 임시: 작업 중이면 센서와 상관없이 계속 돎
 va = VirtualIO()
 cfa = copy.deepcopy(CFG)
