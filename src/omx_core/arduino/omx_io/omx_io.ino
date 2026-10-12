@@ -1,25 +1,26 @@
 // OMX 세컨드 배리어 — 현장 입출력 (Arduino Nano)
 //
 // 배선 (2026-10-08 v4, 사용자 시험 스케치 기준):
-//   도착 센서 D11 · 투입 센서 D12 (IR 모듈 SZH-SSBH-002, 감지 시 LOW, 내부 풀업 — 빠진 핀이 '감지'로 읽히지 않게)
+//   도착 센서 D5 · 투입 센서 D6 (IR 모듈 SZH-SSBH-002, 감지 시 LOW, 내부 풀업 — 빠진 핀이 '감지'로 읽히지 않게)
 //   2026-10-09 v4.2: 도착 센서를 D11 로 옮김 (D12 줄이 계속 LOW 로 붙어 있음 — 배선 확인 전 임시).
+//   2026-10-12 v4.3: 재배선 — 도착 D5 · 투입 D6 · 문 서보 D4 (도착/투입 D5·D6 배정은 실기에서 확인).
 //   상태 줄 순서(s1 투입, s2 도착)는 그대로라 젯슨 쪽은 바뀌지 않는다.
-//   화염 센서 A0 (불꽃이면 값 증가), 출입문 서보 D6 (93° 닫힘 / 10° 열림), 컨베이어 L298N IN1 D9 · IN2 D10
+//   화염 센서 A0 (불꽃이면 값 증가), 출입문 서보 D4 (93° 닫힘 / 10° 열림), 컨베이어 L298N IN1 D9 · IN2 D10
 //   벽면 네오픽셀 16개 D13: 평상시 백색, 사람 감속 주황(O), 사람 정지 빨강(R), 작업 완료 초록(C) — 화재·연결 끊김 때는 백색
 //   대피 유도 네오픽셀 60개 D3
 //   D3: 평상시 은은한 백색, 화재 시 노란 물결이 아두이노 쪽에서 먼 끝(입구) 쪽으로 흐르며 대피 방향을 알린다
 //       (불꽃 센서가 직접 감지했을 때 + 젯슨이 화재 상황(Y)을 알리는 동안 — 관리자 '상황 종료'까지)
-//   상태 줄: s1 = D12 투입, s2 = D11 도착
+//   상태 줄: s1 = D6 투입, s2 = D5 도착
 //
 // 판단은 젯슨이 한다. 아두이노는 젯슨 명령을 따르되, 젯슨 없이도 스스로 지키는 것만 직접 한다:
 //   1) 불꽃 감지(0.1초 이상) → 컨베이어 정지, 출입문 열림, 노란불 (마지막 감지 후 5초 유지, 전원 직후 2초는 무시)
 //   2) 젯슨 명령이 1초 끊기면 → 컨베이어 정지, 출입문 닫힘(불꽃 제외), 흰불
-//   3) 도착 센서(D11) 감지 → 컨베이어 즉시 정지 (젯슨 왕복을 기다리면 물품이 끝을 지나칠 수 있다)
-//   투입 센서(D12)로 출발하는 판단은 젯슨이 한다 (사람 근접·화재·작업 여부를 보고). 아두이노는 값만 보낸다.
+//   3) 도착 센서(D5) 감지 → 컨베이어 즉시 정지 (젯슨 왕복을 기다리면 물품이 끝을 지나칠 수 있다)
+//   투입 센서(D6)로 출발하는 판단은 젯슨이 한다 (사람 근접·화재·작업 여부를 보고). 아두이노는 값만 보낸다.
 //
 // 프로토콜 (9600bps, 줄 단위 텍스트):
 //   젯슨 → 아두이노: "C <conv> <door> <led> [<arr>]"  200ms마다 + 바뀔 때. 받는 것 자체가 하트비트.
-//                    arr = 0 이면 도착 센서(D11)로 멈추지 않음 (센서 고장 시 임시, 젯슨 설정 conveyor.arrive_sensor).
+//                    arr = 0 이면 도착 센서(D5)로 멈추지 않음 (센서 고장 시 임시, 젯슨 설정 conveyor.arrive_sensor).
 //                    없거나 1 이면 기본대로 도착 센서 감지 시 즉시 정지. 연결이 끊기면 기본으로 돌아간다.
 //                    conv/door = 0|1, led = G(대기) B(작업 중) O(사람 감속) R(사람 정지, 재가동 전까지) C(작업 완료)
 //                    Y(화재 — 불꽃이 꺼진 뒤에도 관리자 '상황 종료'까지: 바닥 노란 물결)
@@ -30,11 +31,11 @@
 #include <Servo.h>
 #include <Adafruit_NeoPixel.h>
 
-const int PIN_START = 12;                    // 투입
-const int PIN_ARRIVE = 11;                   // 도착
+const int PIN_START = 6;                     // 투입
+const int PIN_ARRIVE = 5;                    // 도착
 const int PIN_GUIDE = 3;
 const int PIN_FLAME = A0;
-const int PIN_SERVO = 6;
+const int PIN_SERVO = 4;
 const int PIN_IN1 = 9, PIN_IN2 = 10;
 const int PIN_PIXEL = 13;
 
@@ -75,7 +76,7 @@ Adafruit_NeoPixel guide(GUIDE_PIXELS, PIN_GUIDE, NEO_GRB + NEO_KHZ800);
 
 // 젯슨 명령
 bool convCmd = false, doorCmd = false;
-bool arriveStop = true;                      // 도착 센서(D11) 감지 시 정지 (젯슨이 끌 수 있음)
+bool arriveStop = true;                      // 도착 센서(D5) 감지 시 정지 (젯슨이 끌 수 있음)
 char ledCmd = 'G';
 unsigned long lastCmd = 0;
 bool everLinked = false;
@@ -237,7 +238,7 @@ void setup() {
   servoArriveTime = millis();
 
   Serial.begin(9600);
-  Serial.println("# omx_io v4.2 (도착 D11 / 투입 D12 / 화염 A0 / 문 서보 D6 / 모터 D9,D10 / 조명 D13 / 대피유도 D3)");
+  Serial.println("# omx_io v4.3 (도착 D5 / 투입 D6 / 화염 A0 / 문 서보 D4 / 모터 D9,D10 / 조명 D13 / 대피유도 D3)");
   lastFrame = millis();
 }
 
