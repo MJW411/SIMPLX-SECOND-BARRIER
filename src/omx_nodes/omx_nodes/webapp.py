@@ -536,7 +536,8 @@ def create_app(ctx):
         def later():
             time.sleep(0.8)
             if os.environ.get("INVOCATION_ID"):          # systemd 사용자 서비스로 도는 중
-                subprocess.Popen(["systemctl", "--user", "restart" if restart else "stop", "omx.target"],
+                unit = os.environ.get("OMX_SYSTEMD_UNIT", "omx.target")   # omx-launch.service(부팅 자동 실행) 또는 노드별 omx.target
+                subprocess.Popen(["systemctl", "--user", "restart" if restart else "stop", unit],
                                  start_new_session=True)
                 return
             if restart:                                  # ros2 launch(respawn) 로 도는 중: 각 노드를 끝내면 다시 띄운다

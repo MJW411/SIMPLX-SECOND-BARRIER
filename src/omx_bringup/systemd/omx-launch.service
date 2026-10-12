@@ -1,0 +1,25 @@
+# 젯슨을 켜면 바로 `ros2 launch omx_bringup omx.launch.py` 를 실행 (2026-10-12 사용자).
+# 노드 5개는 launch 가 각각 띄우고, 하나가 죽으면 launch 가 3초 뒤 다시 띄운다(respawn). 로봇은 정지 상태로 시작한다.
+# 설치: src/omx_bringup/scripts/install_autostart.sh  (노드별 서비스 omx.target 과 같이 쓰지 않는다)
+[Unit]
+Description=OMX 세컨드 배리어 (ros2 launch omx_bringup omx.launch.py)
+Conflicts=omx.target
+
+[Service]
+Type=simple
+Environment=OMX_DATA_DIR=%h/omx_data
+Environment=ROS_LOCALHOST_ONLY=1
+Environment=PYTHONUNBUFFERED=1
+# 웹 제어판의 '재시작'·'종료'가 이 서비스를 다시 시작·정지한다
+Environment=OMX_SYSTEMD_UNIT=omx-launch.service
+# 부팅 직후 카메라·로봇·아두이노 USB 가 잡힐 시간
+ExecStartPre=/bin/sleep 8
+ExecStart=/bin/bash -c 'source /opt/ros/humble/setup.bash && source %h/ros2_ws/install/setup.bash && exec ros2 launch omx_bringup omx.launch.py'
+# 터미널의 Ctrl+C 와 같은 신호로 끝낸다 (노드들이 로봇을 정지 상태로 두고 끝남)
+KillSignal=SIGINT
+TimeoutStopSec=25
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
