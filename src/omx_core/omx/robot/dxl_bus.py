@@ -149,10 +149,11 @@ class DxlBus:
 
     # ---- 설정 ----
     def configure(self, profile_time_ms, profile_acc_ms, arm_pwm_ratio, watchdog_ms=0, pwm_per_joint=None,
-                  gripper_gains=None):
+                  gripper_gains=None, arm_gains=None):
         """arm_pwm_ratio: 기본 PWM 비율, pwm_per_joint: {관절 인덱스: 비율} 덮어쓰기.
-        gripper_gains: {"p": .., "i": .., "d": ..} 그리퍼 위치 이득 (없거나 0이면 모터 값 그대로)."""
-        self.cfg_args = (profile_time_ms, profile_acc_ms, arm_pwm_ratio, watchdog_ms, pwm_per_joint, gripper_gains)
+        gripper_gains: {"p": .., "i": .., "d": ..} 그리퍼 위치 이득 (없거나 0이면 모터 값 그대로).
+        arm_gains: {관절 인덱스: {"p": .., "i": .., "d": ..}} 팔 관절 위치 이득 (적은 것만 바꿈, RAM 이라 연결할 때마다 다시 씀)."""
+        self.cfg_args = (profile_time_ms, profile_acc_ms, arm_pwm_ratio, watchdog_ms, pwm_per_joint, gripper_gains, arm_gains)
         self.pwm_ratio = [(pwm_per_joint or {}).get(k, arm_pwm_ratio) for k in range(self.n - 1)] + [1.0]
         with self.lock:
             for i in self.ids:
@@ -169,6 +170,15 @@ class DxlBus:
             self.gripper_gains_now = {k: self._r(g, a, 2) for k, a in (("p", ADDR_POS_P), ("i", ADDR_POS_I), ("d", ADDR_POS_D))}
             log.info("그리퍼 위치 이득 P %(p)d I %(i)d D %(d)d, 전류 한도 %(c)d mA",
                      {**self.gripper_gains_now, "c": self.gripper_current})
+            # 팔 관절 I 이득 (2026-10-12): 중력·물건 무게로 처진 만큼 모터가 스스로 더 힘을 줘 되돌리게
+            for k, gains in (arm_gains or {}).items():
+                for name, addr in (("p", ADDR_POS_P), ("i", ADDR_POS_I), ("d", ADDR_POS_D)):
+                    if gains.get(name) is not None:
+                        self._w(self.ids[k], addr, 2, int(gains[name]))
+            self.arm_gains_now = [{n: self._r(i, a, 2) for n, a in (("p", ADDR_POS_P), ("i", ADDR_POS_I), ("d", ADDR_POS_D))}
+                                  for i in self.ids[:-1]]
+            log.info("팔 위치 이득 (P/I/D): %s", ", ".join(f"ID{i} {g['p']}/{g['i']}/{g['d']}"
+                                                         for i, g in zip(self.ids, self.arm_gains_now)))
             if watchdog_ms:
                 for i in self.ids:
                     self._w(i, ADDR_BUS_WDT, 1, max(1, round(watchdog_ms / 20)))
