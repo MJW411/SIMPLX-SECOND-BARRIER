@@ -34,6 +34,7 @@ class CycleRunner:
         self.t_start = 0.0
         self.max_cycles = 0
         self.section = "main"            # 지금 실행 중인 구간: before(시작 전 한 번) / main(반복)
+        self.home_after_done = True      # 정한 횟수를 다 마치면 홈 자세로 복귀 (2026-10-12 사용자, robot.home_after_done)
         self.done = False                # 정한 횟수를 다 마침 → 벽면 초록·완료 알림 (다음 시작·정지까지)
         # 일시 정지: 작업을 끝내지 않고 하던 단계에서 기다린다. 재개하면 그 단계부터 다시, 반복 횟수도 이어서.
         self.pause_evt = threading.Event()
@@ -269,8 +270,11 @@ class CycleRunner:
                 # 통계(대시보드 작업량·사이클 시간)용: 1회 걸린 시간(초). 이벤트 목록·알림에는 안 나온다
                 self.events.emit("cycle_tick", f"{time.monotonic() - t_cycle:.2f}", level="info")
                 if max_cycles and self.cycles >= max_cycles:
+                    self._return_home()
                     self.done = True
-                    self.events.emit("cycle_done", f"작업 완료 — {self.cycles}회 반복", level="info")
+                    home = (" · 홈 복귀" if self.teach.home_q() is not None else " · 홈 자세가 지정되지 않아 그 자리에서 멈춤") \
+                        if self.home_after_done else ""
+                    self.events.emit("cycle_done", f"작업 완료 — {self.cycles}회 반복{home}", level="info")
                     break
                 if limit and time.monotonic() - self.t_start > limit:
                     self.events.emit("cycle_stop", f"작업 자동 정지: 반복 시간 한도 {self.L['cycle_max_minutes']}분 도달", level="info")
@@ -284,6 +288,16 @@ class CycleRunner:
         finally:
             self.step_idx = -1
             self.section = "main"
+
+    def _return_home(self):
+        """작업 완료 → 홈 자세로 (팔만, 그리퍼는 그대로). 홈이 없으면 그 자리에서 끝낸다."""
+        if not self.home_after_done:
+            return
+        if self.teach.home_q() is None:
+            return
+        self.section, self.step_idx = "main", -1
+        self.status = f"작업 완료 ({self.cycles}회) — 홈으로 복귀 중"
+        self._step_retry({"type": "home", "speed": 100}, self.status)
 
     def _step(self, s):
         t = s["type"]
