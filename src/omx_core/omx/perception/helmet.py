@@ -22,6 +22,8 @@ import time
 import cv2
 import numpy as np
 
+from . import overlay_style as OS
+
 log = logging.getLogger("helmet")
 
 
@@ -176,18 +178,23 @@ class HelmetGate:
             return None
         img = img.copy()
         fresh = time.monotonic() - self.last_infer_t < 1.0
+        # 헬멧은 노랑, 사람은 착용 초록 / 미착용 빨강. 라벨은 어두운 바탕 상자에 겹치지 않게 (2026-10-12 사용자:
+        # 헬멧·사람 상자가 같은 초록에 글씨가 겹쳐 안 보였다)
+        labels, tags = OS.Labels(img), []
         for i, d in enumerate(self.last_dets if fresh else []):
             if d.cls in self.helmet_ids:
-                ok, label = True, "helmet"
+                c, label = (0, 215, 255), "helmet"
             elif i in self.last_ok:
                 ok = self.last_ok[i]
-                label = f"{d.name} {'OK' if ok else 'NO HELMET'}"
+                c, label = ((80, 200, 60), f"{d.name} OK") if ok else ((40, 40, 230), f"{d.name} NO HELMET")
             else:
-                ok, label = d.cls not in self.head_ids, d.name
-            c = (80, 200, 60) if ok else (40, 40, 230)
+                ok = d.cls not in self.head_ids
+                c, label = ((80, 200, 60) if ok else (40, 40, 230)), d.name
             x1, y1, x2, y2 = (int(v) for v in d.box)
-            cv2.rectangle(img, (x1, y1), (x2, y2), c, 2)
-            cv2.putText(img, f"{label} {d.conf:.2f}", (x1, max(14, y1 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, c, 2)
+            cv2.rectangle(img, (x1, y1), (x2, y2), c, 2, cv2.LINE_AA)
+            tags.append((f"{label} {d.conf:.2f}", x1, y1, c))
+        for text, x, y, c in tags:
+            labels.put(img, text, x, y, c)
         return img
 
     def snapshot(self):

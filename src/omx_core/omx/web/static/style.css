@@ -33,14 +33,14 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .login-card .brand b { color: var(--text); } .login-card .brand span { color: var(--muted); }
 
 /* ---------- layout ---------- */
-.app { display: grid; grid-template-columns: 216px 1fr; grid-template-rows: auto auto 1fr; min-height: 100vh; }
+.app { display: grid; grid-template-columns: 240px 1fr; grid-template-rows: auto auto 1fr; min-height: 100vh; }
 .sidebar { grid-row: 1 / 4; background: var(--nav); border-right: 1px solid var(--nav-line); padding: 14px 10px;
   display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; height: 100vh; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; margin-bottom: 8px; border-bottom: 1px solid var(--nav-line); }
-.brand img { width: 32px; height: 32px; }
-.brand b { display: block; font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -.01em; }
-.brand span { display: block; font-size: 11px; color: var(--nav-text); letter-spacing: .06em; }
-.brand.big img { width: 42px; height: 42px; } .brand.big b { font-size: 18px; } .login-card .brand { border-bottom-color: var(--line); }
+.brand img { width: 44px; height: 44px; }
+.brand b { display: block; font-size: 19px; font-weight: 800; color: #fff; letter-spacing: -.01em; line-height: 1.2; white-space: nowrap; }
+.brand span { display: block; font-size: 12.5px; color: var(--nav-text); letter-spacing: .06em; }
+.brand.big img { width: 56px; height: 56px; } .brand.big b { font-size: 24px; } .login-card .brand { border-bottom-color: var(--line); }
 .sidebar a { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 4px; color: var(--nav-text);
   cursor: pointer; user-select: none; position: relative; font-weight: 600; font-size: 15.5px; padding: 11px 12px; }
 .sidebar a svg { color: #e3f0ff; width: 20px; height: 20px; }
@@ -516,9 +516,9 @@ details.more { margin-top: 12px; } details.more summary { cursor: pointer; color
   .small { font-size: 14px; }
   h3 { font-size: 15px; }
   code { font-size: 13px; }
-  .brand b { font-size: 16.5px; }
-  .brand span { font-size: 12px; }
-  .brand.big b { font-size: 20px; }
+  .brand b { font-size: 19px; }
+  .brand span { font-size: 13px; }
+  .brand.big b { font-size: 26px; }
   .sidebar a { font-size: 17px; }
   .count { font-size: 12px; }
   .side-foot { font-size: 13px; }
