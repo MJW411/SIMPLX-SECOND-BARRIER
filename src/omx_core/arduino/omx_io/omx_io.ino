@@ -64,7 +64,8 @@ const unsigned long SERVO_STEP_INTERVAL = SERVO_MOVE_TIME / abs(ANGLE_CLOSED - A
 // 불꽃 센서: 빛이 셀수록 값이 낮아진다 (2026-10-12 사용자 확인). 평상시(조명·LED 켜짐) 실측 849~868.
 // 2026-10-08 실기에서 기준 방향이 반대(크면 불꽃)라 늘 화재로 잡혀 보류했다 → 2026-10-12 v4.4: 방향 바로잡아 다시 켬.
 const bool FLAME_ENABLED = true;
-const int FLAME_THRESHOLD = 600;              // 이 값보다 낮으면 불꽃 (평상시 ~860 과 충분히 떨어지게. 라이터 실측 후 조정)
+// 2026-10-12 라이터 실측: 가까이 290~480, 조금 멀리 606~700 / 평상시 849~1003 → 750 (평상시 최저와 약 100 여유)
+const int FLAME_THRESHOLD = 750;              // 이 값보다 낮으면 불꽃
 const unsigned long FLAME_HOLD_TIME = 5000;   // 마지막 감지 후 화재 유지 (ms)
 const unsigned long FLAME_WARMUP = 2000;      // 전원 직후 0.5초쯤 값이 300대로 낮게 나온다(실측) → 그동안 무시
 const unsigned long FLAME_CONFIRM = 100;      // 기준 아래로 이만큼 계속 있어야 불꽃 (순간 튐 거르기)
